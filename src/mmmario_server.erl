@@ -2,6 +2,8 @@
 %%% @author lycaon
 %%% @copyright (C) 2014, <COMPANY>
 %%% @doc
+%%% MMMarioのゲーム用サーバー。処理とかはここで行う
+%%%
 %%%
 %%% @end
 %%% Created : 09. 8 2014 0:49
@@ -10,9 +12,9 @@
 -behaviour(gen_server).
 -author("lycaon").
 
--ifndef(DEBUGMODE).
+-ifndef(DEBUG).
 %% API
--export([start/0]).
+-export([start/0, get_serv_name/0, request/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -else.
 %% デバッグ用エクスポート
@@ -28,13 +30,27 @@
 %% 表示するデバイスの情報を保持するレコード
 -record(displayInfo, {rect = {0, 0, 600, 400}}).
 
+-define(SERV_NAME, mmmsrv).
+
 %%--------------------------------------------------------------------
-%% gen_server用コールバック
+%% 公開API
 %%--------------------------------------------------------------------
 
 %% gen_serverの開始
 start() ->
-  gen_server:start_link({global, mmmsrv}, ?MODULE, [], [dbg, [trace, log]]).
+  gen_server:start_link({global, ?SERV_NAME}, ?MODULE, [], [dbg, [trace, log]]).
+
+%% サーバー名の取得
+get_serv_name() ->
+  ?SERV_NAME.
+
+%% gen_server:call/2の呼び出し
+request(Request) ->
+  gen_server:call({global, ?SERV_NAME}, Request).
+
+%%--------------------------------------------------------------------
+%% gen_server用コールバック
+%%--------------------------------------------------------------------
 
 %% 初期化コールバック
 init(Args) ->
@@ -42,8 +58,11 @@ init(Args) ->
 
 %% 同期呼び出しコールバック
 handle_call(Request, From, State) ->
-  {{success, Reply}, NewState} = request_handler(Request, From, State),
-  {reply, Reply, NewState}.
+  case request_handler(Request, From, State) of
+    {{success, Reply}, NewState} -> {reply, Reply, NewState};
+    {{error, Reply}, NewState} -> {stop, Reply, Reply, NewState};
+    _ -> erlang:error(no_matching_result_of_request_handler)
+  end.
 
 %% 非同期呼び出しコールバック
 handle_cast(Request, State) ->
@@ -93,7 +112,7 @@ request_handler(Request, {Pid, Tag}, State) ->
       {{success, "Thank you for playing."}, retire(Pid, State)};
 
     _ -> % 何にもマッチしないとき
-      erlang:eror(no_matching_command)
+      {{error, "No matching command."}, State}
   end.
 
 %%
