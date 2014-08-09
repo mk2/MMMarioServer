@@ -19,9 +19,14 @@
 -compile([debug_info, export_all]).
 -endif.
 
+%% マリオレコード
+-record(mario, {name, pos = {0, 0}}).
 %% ゲームの状態を保持するレコード
--record(mario, {name, pos = {x, y}}).
--record(gameState, {marios = [], time = 0}).
+%% mariosは{pid(), mario}のタプルリスト
+%% dispsは{pid(), displayInfo}のタプルリスト
+-record(gameState, {marios = [], time = 0, disps = []}).
+%% 表示するデバイスの情報を保持するレコード
+-record(displayInfo, {rect = {0, 0, 600, 400}}).
 
 %%--------------------------------------------------------------------
 %% gen_server用コールバック
@@ -29,15 +34,16 @@
 
 %% gen_serverの開始
 start() ->
-  {ok, Pid} = gen_server:start_link(msrv, ?MODULE, [], [dbg, [trace, log]]).
+  gen_server:start_link({global, mmmsrv}, ?MODULE, [], [dbg, [trace, log]]).
 
 %% 初期化コールバック
 init(Args) ->
-  {ok, #gameState{marios = [], time = 0}}.
+  {ok, #gameState{}}.
 
 %% 同期呼び出しコールバック
 handle_call(Request, From, State) ->
-  erlang:error(not_implemented).
+  {{success, Reply}, NewState} = request_handler(Request, From, State),
+  {reply, Reply, NewState}.
 
 %% 非同期呼び出しコールバック
 handle_cast(Request, State) ->
@@ -47,7 +53,14 @@ handle_info(Info, State) ->
   erlang:error(not_implemented).
 
 terminate(Reason, State) ->
-  erlang:error(not_implemented).
+  io:format("terminate called, last server state = ~p~n", [State]),
+  case Reason of
+    normal -> ok;
+    shutdonw -> ok;
+    {shutdown, something} -> ok;
+    something -> ok;
+    _ -> ok
+  end.
 
 code_change(OldVsn, State, Extra) ->
   erlang:error(not_implemented).
@@ -56,20 +69,69 @@ code_change(OldVsn, State, Extra) ->
 %% PRIVATE関数
 %%--------------------------------------------------------------------
 
-%% マリオの情報を更新
-update_mario(Mario, GameState = #gameState{marios = Marios}) ->
-  delete_mario(Mario, GameState),
-  add_mario(Mario, GameState).
+%% リクエストを処理
+%% リクエストの内容に応じて状態を更新し、それを返す。
+request_handler(Request, {Pid, Tag}, State) ->
+  case Request of
 
-%% マリオの情報をゲーム状態に追加
-add_mario(Mario = #mario{pos = {X, Y}}, GameState = #gameState{marios = Marios}) ->
-  io:format("mario position : x = ~p, y = ~p~n", [X, Y]),
-  GameState#gameState{marios = [Mario | Marios]}.
+    {join, DisplayInfo} -> % 参加する場合
+      NewState = join(Pid, DisplayInfo, State),
+      AllMarioPos = get_all_mario_pos(NewState#gameState.marios),
+      {{success, AllMarioPos}, NewState};
 
-%% マリオの情報をゲーム状態に追加
-delete_mario(Mario, GameState = #gameState{marios = Marios}) ->
-  GameState#gameState{marios = lists:delete(Mario, Marios)}.
+    {move, Mario} -> % マリオを動かす場合
+      NewState = move(Pid, Mario, State),
+      AllMarioPos = get_all_mario_pos(NewState#gameState.marios),
+      {{success, AllMarioPos}, NewState};
+
+    {change_display, DisplayInfo} -> % 表示を変更する場合
+      NewState = change_display(Pid, DisplayInfo, State),
+      AllMarioPos = get_all_mario_pos(NewState#gameState.marios),
+      {{success, AllMarioPos}, NewState};
+
+    {retire} -> % ゲームを辞める場合
+      {{success, "Thank you for playing."}, retire(Pid, State)};
+
+    _ -> % 何にもマッチしないとき
+      erlang:eror(no_matching_command)
+  end.
+
+%%
+%% 実際の処理を行う関数
+%%
+
+%% ゲームに参加する時呼ぶ
+join(Key, DisplayInfo, GameState = #gameState{marios = Marios, disps = Disps}) ->
+  Exist = lists:keyfind(Key, 1, Disps),
+  if Exist =:= false ->
+    io:format("pid = ~p~n", [Key]),
+    GameState#gameState{marios = [{Key, #mario{name = uid()}} | Marios], disps = [{Key, DisplayInfo} | Disps]};
+    true -> erlang:error(already_joined)
+  end.
+
+
+%% マリオを動かす
+move(Key, Mario, GameState = #gameState{marios = Marios}) ->
+  GameState#gameState{marios = lists:keystore(Key, 1, Marios, {Key, Mario})}.
+
+%% 表示情報の更新
+change_display(Key, NewDisplayInfo, GameState = #gameState{disps = Disps}) ->
+  GameState#gameState{disps = lists:keystore(Key, 1, Disps, {Key, NewDisplayInfo})}.
+
+%% ゲームを辞めるとき呼ぶ
+retire(Key, GameState = #gameState{marios = Marios, disps = Disps}) ->
+  GameState#gameState{marios = lists:keydelete(Key, 1, Marios), disps = lists:keydelete(Key, 1, Disps)}.
+
+%%
+%% マリオの操作関数
+%%
 
 %% すべてのマリオの位置情報をリストとして取得
-get_all_mario_pos(#gameState{marios = Marios}) ->
-  [Pos || #mario{pos = Pos} <- Marios].
+get_all_mario_pos(Marios) ->
+  [Mario#mario.pos || {_Key, Mario} <- Marios].
+
+%%
+%% ユーティリティ関数
+%%
+uid() ->
+  {node(), now()}.
