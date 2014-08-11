@@ -54,6 +54,7 @@ request(Request) ->
 
 %% 初期化コールバック
 init(Args) ->
+  process_flag(trap_exit, true),
   {ok, #gameState{}}.
 
 %% 同期呼び出しコールバック
@@ -71,6 +72,8 @@ handle_cast(Request, State) ->
 handle_info(Info, State) ->
   erlang:error(not_implemented).
 
+%% 終了関数
+%% よくわからん
 terminate(Reason, State) ->
   io:format("terminate called, last server state = ~p~n", [State]),
   case Reason of
@@ -154,3 +157,14 @@ get_all_mario_pos(Marios) ->
 %%
 uid() ->
   {node(), now()}.
+
+
+%%--------------------------------------------------------------------
+%% テスト関数
+%%--------------------------------------------------------------------
+mmmario_server_test() ->
+  io:format("test begin.~n"),
+  {ok, Pid} = start(),
+  request({join, #displayInfo{}}),
+  request({move, #mario{pos = {100, 100}}}),
+  erlang:exit(Pid, normal).
