@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(mmmario_sup).
 -behaviour(supervisor).
--author("nijibox").
+-author("lycaon").
 
 %% API
 -export([init/1]).

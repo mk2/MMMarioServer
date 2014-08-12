@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(mmmario).
 -behaviour(application).
--author("nijibox").
+-author("lycaon").
 
 %% API
 -export([start/2, stop/1]).
