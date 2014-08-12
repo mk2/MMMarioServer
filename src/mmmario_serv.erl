@@ -8,13 +8,13 @@
 %%% @end
 %%% Created : 09. 8 2014 0:49
 %%%-------------------------------------------------------------------
--module(mmmario_server).
+-module(mmmario_serv).
 -behaviour(gen_server).
 -author("lycaon").
 
 -ifndef(DEBUG).
 %% API
--export([start/0, get_serv_name/0, request/1]).
+-export([start_link/0, get_serv_name/0, request/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -else.
 %% デバッグ用エクスポート
@@ -23,13 +23,16 @@
 
 %% マリオレコード
 -record(mario, {name, pos = {0, 0}}).
+
 %% ゲームの状態を保持するレコード
 %% mariosは{pid(), mario}のタプルリスト
 %% dispsは{pid(), displayInfo}のタプルリスト
 -record(gameState, {marios = [], time = 0, disps = []}).
+
 %% 表示するデバイスの情報を保持するレコード
 -record(displayInfo, {rect = {0, 0, 600, 400}}).
 
+%% サーバー名、local
 -define(SERV_NAME, mmmsrv).
 
 %%--------------------------------------------------------------------
@@ -38,7 +41,9 @@
 
 %% gen_serverの開始
 start() ->
-  gen_server:start_link({global, ?SERV_NAME}, ?MODULE, [], [dbg, [trace, log]]).
+  gen_server:start({local, ?SERV_NAME}, ?MODULE, [], [dbg, [trace, log]]).
+start_link() ->
+  gen_server:start_link({local, ?SERV_NAME}, ?MODULE, [], [dbg, [trace, log]]).
 
 %% サーバー名の取得
 get_serv_name() ->

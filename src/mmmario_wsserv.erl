@@ -8,7 +8,7 @@
 %%% @end
 %%% Created : 10. 8 2014 0:16
 %%%-------------------------------------------------------------------
--module(mmmario_ws_interface).
+-module(mmmario_wsserv).
 -author("lycaon").
 
 -ifndef(DEBUG).
@@ -32,7 +32,9 @@ accepter_loop(SPid, LSock) ->
   {ok, CSock} = gen_tcp:accept(LSock),
   io:format("waiting for connection.~n"),
   case do_handshake(CSock) of
-    {ok, _CSock} -> io:format("handshake passed.~n"), spawn_link(?MODULE, client_loop, [SPid, CSock]);
+    {ok, _CSock} -> io:format("handshake passed.~n"),
+      CPid = spawn_link(?MODULE, client_loop, [SPid, CSock]),
+      gen_tcp:controlling_process(CSock, CPid);
     _ -> accepter_loop(SPid, LSock)
   end.
 
@@ -51,7 +53,7 @@ client_loop(SPid, CSock) ->
 %%%-------------------------------------------------------------------
 %%% テスト関数
 %%%-------------------------------------------------------------------
-mmmario_ws_test() ->
+mmmario_wsserv_test() ->
   PortNum = 8080,
   {ok, SPid} = start(PortNum),
   {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PortNum, [list, {active, true}]),
