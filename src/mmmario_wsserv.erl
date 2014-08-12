@@ -19,7 +19,7 @@
 -compile([debug_info, export_all]).
 -endif.
 
--define(WEBSOCKET_PREFIX, "HTTP/1.1 101 OK upgrade: websocket\r\nconnection: upgrade\r\nsec-websocket-accept: ").
+-define(WEBSOCKET_PREFIX, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: upgrade\r\nSec-WebSocket-Protocol: chat\r\nSec-Websocket-Accept: ").
 -define(WEBSOCKET_APPEND_TO_KEY, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").
 
 %% 開始メソッド。MMMarioサーバーを開始後、待ちループに入る。
@@ -64,6 +64,7 @@ do_handshake(CSock, Headers) ->
 %% ヘッダー情報をまるっと受け取ったらここでヘッダーの内容をチェックし、大丈夫ならsend_handshakeを呼び出して
 %% openingハンドシェイクを送信する
 verify_handshake(CSock, Headers) ->
+  io:format("Headers: ~p~n", [Headers]),
   {ok, CSock}.
 
 %% openingハンドシェイクを送信する
@@ -86,6 +87,14 @@ client_loop(SPid, CSock) ->
     {error, Reason} -> io:format("error Reason = ~p~n", [Reason]), exit(self(), Reason);
     _ -> erlang:error(unknown_msg)
   end.
+
+%% websocketのデータフレームをデコード
+decode_ws_dataframe(DataFrame) ->
+  {"data"}.
+
+%% データをwebsocketのデータフレームへエンコード
+encode_ws_dataframe(Data, Opts) ->
+  {}.
 
 %%%-------------------------------------------------------------------
 %%% テスト関数
