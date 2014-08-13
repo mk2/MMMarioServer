@@ -46,12 +46,13 @@ accepter_loop(SPid, LSock) ->
 do_handshake(CSock, Headers) ->
   case gen_tcp:recv(CSock, 0) of
     {ok, {http_request, _Method, {abs_path, Path}, _Version}} ->
-      do_handshake(CSock, maps:put(path, Path, Headers));
+      do_handshake(CSock, Headers#{path => Path});
     {ok, {http_header, _, HttpField, _, Value}} ->
-      do_handshake(CSock, maps:put({http_field, HttpField}, Value, Headers));
+      HKey = {http_field, HttpField},
+      do_handshake(CSock, maps:put(HKey, Value, Headers));
     {error, "\r\n"} -> do_handshake(CSock, Headers);
     {error, "\n"} -> do_handshake(CSock, Headers);
-    {ok, http_eoh} ->
+    {ok, http_eoh} -> % ヘッダが終了したらハンドシェイク処理に入る
       verify_handshake(CSock, Headers);
     _Others ->
       io:format("Unknown data: ~p~n", [_Others]),
@@ -65,10 +66,19 @@ do_handshake(CSock, Headers) ->
 %% openingハンドシェイクを送信する
 verify_handshake(CSock, Headers) ->
   io:format("Headers: ~p~n", [Headers]),
+  catch true = string:equal("websocket", string:to_lower(maps:get({http_field, 'Upgrade'}))),
+  catch true = string:equal("upgrade", string:to_lower(maps:get({http_field, 'Connection'}))),
+  catch true = string:equal("13", string:to_lower(maps:get({http_field, "Sec-Websocket-Version"}))),
+  catch {ok, _} = maps:find({http_field, "Sec-Websocket-Key"}, Headers),
+  send_handshake(CSock, Headers),
   {ok, CSock}.
 
 %% openingハンドシェイクを送信する
 send_handshake(CSock, Headers) ->
+  SWKey = maps:get({http_field, "Sec-Websocket-Key"}, Headers),
+  AcceptHeaderValue = make_accept_header_value(SWKey),
+  AcceptHeader = ?WEBSOCKET_PREFIX ++ AcceptHeaderValue ++ "\r\n\r\n",
+  gen_tcp:send(CSock, AcceptHeader),
   {ok, CSock}.
 
 %% websocketのアクセプトヘッダの値を作る
@@ -112,8 +122,16 @@ mmmario_wsserv_test() ->
     ++ "Sec-Websocket-Key: E4WSEcseoWr4csPLS2QJHA==\r\n"
     ++ "\r\n",
   gen_tcp:send(Socket, InitialSampleRequestHeader),
+  mmario_wsserv_test_loop(Socket).
+
+mmario_wsserv_test_loop(Socket) ->
   receive
-    {tcp, _Port, Msg} -> io:format("msg = ~p~n", [Msg]);
+    {tcp, _Port, Msg} -> io:format("msg = ~p~n", [Msg]), mmario_wsserv_test_loop(Socket);
+    {http, _Port, {http_response, _Version, Status, Msg}} ->
+      io:format("response status: ~p   msg: ~p~n", [Status, Msg]), mmario_wsserv_test_loop(Socket);
+    {http, _Port, {http_header, _Version, Header, _, Value}} ->
+      io:format("header header: ~p   value: ~p~n", [Header, Value]), mmario_wsserv_test_loop(Socket);
+    {http, _Port, http_eoh} -> io:format("All headers recieved.~n");
     What -> io:format("what = ~p~n", [What]), erlang:error(What)
   end.
 
