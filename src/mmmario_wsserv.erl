@@ -101,18 +101,15 @@ client_loop(SPid, CSock) ->
 %% websocketのデータフレームをデコード
 decode_ws_dataframe(DataFrame) ->
   <<Fin:1, _Rsvs:3, OpCode:4, Mask:1, PayloadLen:7, RemainDataFrame/binary>> = DataFrame,
-  [Fin, OpCode, Mask, PayloadLen, RemainDataFrame].
+  {Fin, OpCode, Mask, PayloadLen, RemainDataFrame}.
 
 %% データをwebsocketのデータフレームへエンコード
 encode_ws_dataframe(Data, Opts) ->
   % とりあえずデータは1メッセージに収まるという想定
-  Fin = <<0>>,
-  Rsvs = <<0, 0, 0>>,
-  OpCode = <<16#1:4/unit:1>>,
-  Mask = <<0>>,
+  FinRsvsOpCode = 2#10000000 bor 16#1,
   DataByteSize = byte_size(Data),
-  PayloadLength = <<DataByteSize:7/unit:1>>,
-  [Fin, Rsvs, OpCode, Mask, PayloadLength, Data].
+  MaskPayloadLength = 2#00000000 bor DataByteSize,
+  <<FinRsvsOpCode, MaskPayloadLength, Data/binary>>.
 
 %%%-------------------------------------------------------------------
 %%% テスト関数
@@ -160,4 +157,5 @@ make_accept_header_value_test() ->
 
 encode_ws_dataframe_test(Data) ->
   WSDataFrame = mmmario_wsserv:encode_ws_dataframe(Data, {}),
-  io:format("WS Dataframe: ~p~n", [WSDataFrame]).
+  io:format("WS Dataframe: ~p~n", [WSDataFrame]),
+  {1, 1, 0, 4, <<"test">>} = mmmario_wsserv:decode_ws_dataframe(WSDataFrame).
