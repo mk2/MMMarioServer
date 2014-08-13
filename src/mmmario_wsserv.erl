@@ -100,11 +100,19 @@ client_loop(SPid, CSock) ->
 
 %% websocketのデータフレームをデコード
 decode_ws_dataframe(DataFrame) ->
-  {"data"}.
+  <<Fin:1, _Rsvs:3, OpCode:4, Mask:1, PayloadLen:7, RemainDataFrame/binary>> = DataFrame,
+  [Fin, OpCode, Mask, PayloadLen, RemainDataFrame].
 
 %% データをwebsocketのデータフレームへエンコード
 encode_ws_dataframe(Data, Opts) ->
-  {}.
+  % とりあえずデータは1メッセージに収まるという想定
+  Fin = <<0>>,
+  Rsvs = <<0, 0, 0>>,
+  OpCode = <<16#1:4/unit:1>>,
+  Mask = <<0>>,
+  DataByteSize = byte_size(Data),
+  PayloadLength = <<DataByteSize:7/unit:1>>,
+  [Fin, Rsvs, OpCode, Mask, PayloadLength, Data].
 
 %%%-------------------------------------------------------------------
 %%% テスト関数
@@ -122,17 +130,26 @@ mmmario_wsserv_test() ->
     ++ "Sec-Websocket-Key: E4WSEcseoWr4csPLS2QJHA==\r\n"
     ++ "\r\n",
   gen_tcp:send(Socket, InitialSampleRequestHeader),
-  mmario_wsserv_test_loop(Socket).
+  mmmario_wsserv_test_loop(Socket).
 
-mmario_wsserv_test_loop(Socket) ->
+mmmario_wsserv_test_loop(Socket) ->
   receive
-    {tcp, _Port, Msg} -> io:format("msg = ~p~n", [Msg]), mmario_wsserv_test_loop(Socket);
+    {tcp, _Port, Msg} -> io:format("msg = ~p~n", [Msg]), mmmario_wsserv_test_loop(Socket);
     {http, _Port, {http_response, _Version, Status, Msg}} ->
-      io:format("response status: ~p   msg: ~p~n", [Status, Msg]), mmario_wsserv_test_loop(Socket);
+      io:format("response status: ~p   msg: ~p~n", [Status, Msg]), mmmario_wsserv_test_loop(Socket);
     {http, _Port, {http_header, _Version, Header, _, Value}} ->
-      io:format("header header: ~p   value: ~p~n", [Header, Value]), mmario_wsserv_test_loop(Socket);
-    {http, _Port, http_eoh} -> io:format("All headers recieved.~n");
+      io:format("header header: ~p   value: ~p~n", [Header, Value]), mmmario_wsserv_test_loop(Socket);
+    {http, _Port, http_eoh} ->
+      io:format("All headers recieved.~n"),
+      inet:setopts(Socket, {packet, 0}),
+      mmmario_wsserv_test_msg_loop(Socket);
     What -> io:format("what = ~p~n", [What]), erlang:error(What)
+  end.
+
+mmmario_wsserv_test_msg_loop(Socket) ->
+  gen_tcp:send(Socket, encode_ws_dataframe(<<"test">>, {})),
+  receive
+    All -> io:format("Recv: ~p~n", [All]), mmmario_wsserv_test_msg_loop(Socket)
   end.
 
 make_accept_header_value_test() ->
@@ -140,3 +157,7 @@ make_accept_header_value_test() ->
   AcceptHeaderValue = make_accept_header_value(SWKey),
   io:format("AcceptHeaderValue: ~p~n", [AcceptHeaderValue]),
   "7eQChgCtQMnVILefJAO6dK5JwPc=" = AcceptHeaderValue.
+
+encode_ws_dataframe_test(Data) ->
+  WSDataFrame = mmmario_wsserv:encode_ws_dataframe(Data, {}),
+  io:format("WS Dataframe: ~p~n", [WSDataFrame]).
