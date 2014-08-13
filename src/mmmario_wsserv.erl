@@ -19,14 +19,14 @@
 -compile([debug_info, export_all]).
 -endif.
 
--define(WEBSOCKET_PREFIX, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: upgrade\r\nSec-WebSocket-Protocol: chat\r\nSec-Websocket-Accept: ").
+-define(WEBSOCKET_PREFIX, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: upgrade\r\nSec-Websocket-Accept: ").
 -define(WEBSOCKET_APPEND_TO_KEY, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").
 
 %% 開始メソッド。MMMarioサーバーを開始後、待ちループに入る。
 start(Port) ->
   % {_, SPid} = mmmario_server:start(),
   SPid = undefined,
-  {ok, LSock} = gen_tcp:listen(Port, [list, {active, false}, {packet, http}]),
+  {ok, LSock} = gen_tcp:listen(Port, [binary, {active, false}, {packet, http}]),
   spawn_link(?MODULE, accepter_loop, [SPid, LSock]),
   {ok, SPid}.
 
@@ -37,6 +37,7 @@ accepter_loop(SPid, LSock) ->
   {ok, CSock} = gen_tcp:accept(LSock),
   case do_handshake(CSock, maps:new()) of
     {ok, _CSock} -> io:format("handshake passed.~n"),
+      inet:setopts(CSock, [{packet, raw}]),
       CPid = spawn_link(?MODULE, client_loop, [SPid, CSock]),
       gen_tcp:controlling_process(CSock, CPid);
     _ -> accepter_loop(SPid, LSock)
@@ -93,7 +94,12 @@ make_accept_header_value(SWKey) ->
 %% クライアントループ
 client_loop(SPid, CSock) ->
   case gen_tcp:recv(CSock, 0) of
-    {ok, Packet} -> io:format("packet is ~p~n", [Packet]), gen_tcp:send(CSock, Packet), client_loop(SPid, CSock);
+    {ok, Packet} ->
+      io:format("packet is ~p~n", [Packet]),
+      {Fin, OpCode, Mask, PayloadLen, Data} = decode_ws_dataframe(Packet),
+      io:format("Data: ~p~n", [Data]),
+      io:format("PayloadLen: ~p~n", [PayloadLen]),
+      gen_tcp:send(CSock, encode_ws_dataframe(<<"t">>, {})), client_loop(SPid, CSock);
     {error, Reason} -> io:format("error Reason = ~p~n", [Reason]), exit(self(), Reason);
     _ -> erlang:error(unknown_msg)
   end.
@@ -117,7 +123,7 @@ encode_ws_dataframe(Data, Opts) ->
 mmmario_wsserv_test() ->
   PortNum = 8080,
   {ok, SPid} = start(PortNum),
-  {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PortNum, [list, {active, true}, {packet, http}]),
+  {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PortNum, [binary, {active, true}, {packet, http}]),
   InitialSampleRequestHeader = ""
     ++ "GET /resource HTTP/1.1\r\n"
     ++ "Host: localhost\r\n"
@@ -138,7 +144,7 @@ mmmario_wsserv_test_loop(Socket) ->
       io:format("header header: ~p   value: ~p~n", [Header, Value]), mmmario_wsserv_test_loop(Socket);
     {http, _Port, http_eoh} ->
       io:format("All headers recieved.~n"),
-      inet:setopts(Socket, {packet, 0}),
+      inet:setopts(Socket, [{packet, raw}]),
       mmmario_wsserv_test_msg_loop(Socket);
     What -> io:format("what = ~p~n", [What]), erlang:error(What)
   end.
@@ -146,7 +152,7 @@ mmmario_wsserv_test_loop(Socket) ->
 mmmario_wsserv_test_msg_loop(Socket) ->
   gen_tcp:send(Socket, encode_ws_dataframe(<<"test">>, {})),
   receive
-    All -> io:format("Recv: ~p~n", [All]), mmmario_wsserv_test_msg_loop(Socket)
+    All -> io:format("Recv: ~p~n", [All])
   end.
 
 make_accept_header_value_test() ->
