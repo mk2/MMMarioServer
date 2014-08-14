@@ -19,8 +19,33 @@
 -compile([debug_info, export_all]).
 -endif.
 
+%% WebSocket周りの定数
 -define(WEBSOCKET_PREFIX, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: upgrade\r\nSec-Websocket-Accept: ").
 -define(WEBSOCKET_APPEND_TO_KEY, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").
+
+%% FINグループ
+-define(FIN_ON, 2#1).
+-define(FIN_OFF, 2#0).
+
+%% OPCODE一覧
+-define(OPCODE_CONTINUE, 16#0).
+-define(OPCODE_TEXT, 16#1).
+-define(OPCODE_BIN, 16#2).
+-define(OPCODE_CLOSE, 16#8).
+-define(OPCODE_PING, 16#9).
+-define(OPCODE_PONG, 16#A).
+
+%% MASKグループ
+-define(MASK_ON, 2#1).
+-define(MASK_OFF, 2#0).
+
+%% Payload Length
+-define(PAYLOAD_LENGTH_NORMAL, 10#125).
+-define(PAYLOAD_LENGTH_EXTEND_16, 10#126).
+-define(PAYLOAD_LENGTH_EXTEND_64, 10#127).
+
+%% WebSocketのデータフレームを格納するレコード
+-record(wsdf, {fin, rsv1 = 0, rsv2 = 0, rsv3 = 0, opcode, mask, pl, maskkey, rawpacket})
 
 %% 開始メソッド。MMMarioサーバーを開始後、待ちループに入る。
 start(Port) ->
