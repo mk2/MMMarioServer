@@ -281,12 +281,12 @@ encode_ws_dataframe(Data, Opts) ->
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_16,
       <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:2/unsigned-integer-unit:8, MaskKey:16, NewData/binary>>;
 
-    ?PAYLOAD_LENGTH_NORMAL < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_64, MaskKey =:= undefined ->
+    ?MAX_UNSIGNED_INTEGER_16 < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_64, MaskKey =:= undefined ->
       io:format("PL EXTEND64 MASK OFF~n"),
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_64,
       <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:8/unsigned-integer-unit:8, NewData/binary>>;
 
-    ?PAYLOAD_LENGTH_NORMAL < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_64 ->
+    ?MAX_UNSIGNED_INTEGER_16 < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_64 ->
       io:format("PL EXTEND64 MASK ON~n"),
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_64,
       <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:8/unsigned-integer-unit:8, MaskKey:16, NewData/binary>>;

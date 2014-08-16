@@ -22,8 +22,19 @@ url = "ws://localhost:8080"
 msg : Input Content
 msg = input noContent
 
+-- 送信ボタンインプット
+send : Input String
+send = input ""
+
+-- メッセージ入力フォーム
 msgField : Content -> Element
 msgField = field defaultStyle msg.handle id "Msg"
+
+-- 送信ボタンを表示するための関数
+sendButton : Content -> Element
+sendButton msgContent =
+    button send.handle msgContent.string "Send"
+
 
 -- レスポンスを表示する関数
 dispResponse : String -> Element
@@ -35,13 +46,14 @@ contentString content = content.string
 
 -- レスポンスを示すシグナル
 responseSignal : Signal String
-responseSignal = WebSocket.connect url <| contentString <~ msg.signal
+responseSignal = WebSocket.connect url <| sampleOn send.signal <| contentString <~ msg.signal
 
 -- 入力フォームを表示するための関数
 msgForm : Content -> Element
 msgForm msgContent =
     flow right [
                  msgField msgContent
+               , sendButton msgContent
                ]
 
 -- 全体（入力フォーム、送信ボタン）を表示するための関数
