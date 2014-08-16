@@ -14,7 +14,7 @@
 
 -ifndef(DEBUG).
 %% API
--export([start_link/0, get_serv_name/0, request/1]).
+-export([start_link/0, request/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -else.
 %% デバッグ用エクスポート
@@ -32,26 +32,19 @@
 %% 表示するデバイスの情報を保持するレコード
 -record(displayInfo, {rect = {0, 0, 600, 400}}).
 
-%% サーバー名、local
--define(SERV_NAME, mmmsrv).
-
 %%--------------------------------------------------------------------
 %% 公開API
 %%--------------------------------------------------------------------
 
 %% gen_serverの開始
 start() ->
-  gen_server:start({local, ?SERV_NAME}, ?MODULE, [], [dbg, [trace, log]]).
+  gen_server:start({local, ?MODULE}, ?MODULE, [], [dbg, [trace, log]]).
 start_link() ->
-  gen_server:start_link({local, ?SERV_NAME}, ?MODULE, [], [dbg, [trace, log]]).
-
-%% サーバー名の取得
-get_serv_name() ->
-  ?SERV_NAME.
+  gen_server:start_link({local, ?MODULE}, ?MODULE, [], [dbg, [trace, log]]).
 
 %% gen_server:call/2の呼び出し
 request(Request) ->
-  gen_server:call({global, ?SERV_NAME}, Request).
+  gen_server:call({global, ?MODULE}, Request).
 
 %%--------------------------------------------------------------------
 %% gen_server用コールバック

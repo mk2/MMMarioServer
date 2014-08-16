@@ -9,11 +9,13 @@
 %%% Created : 10. 8 2014 0:16
 %%%-------------------------------------------------------------------
 -module(mmmario_wsserv).
+-behaviour(gen_server).
 -author("lycaon").
 
 -ifndef(DEBUG).
 %% API
--export([]).
+-export([start_link/1]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -else.
 %% デバッグ用エクスポート
 -compile([debug_info, export_all]).
@@ -50,6 +52,9 @@
 -define(MAX_UNSIGNED_INTEGER_16, 65532).
 -define(MAX_UNSIGNED_INTEGER_64, 9223372036854775807).
 
+%% handle_infoで楽にTCPパケットを受け取るためのマクロ
+-define(SOCK(Msg), {tcp, _Port, Msg}).
+
 %% WebSocketのデータフレームを格納するレコード
 -record(wsdataframe, {
   fin = ?FIN_OFF,
@@ -59,29 +64,102 @@
   pllen = 2#0,
   maskkey = 2#0,
   data,
-  rawpacket}).
+  rawpacket
+}).
 
-%% 開始メソッド。MMMarioサーバーを開始後、待ちループに入る。
-start(Port) ->
-  % {_, SPid} = mmmario_server:start(),
+%% wsserveの状態
+-record(wsservstate, {
+  lsock,
+  csock,
+  spid,
+  wsdataframe = #wsdataframe{}
+}).
+
+%%%-------------------------------------------------------------------
+%%% gen_server コールバック
+%%%-------------------------------------------------------------------
+
+init(LSock) ->
   SPid = undefined,
-  {ok, LSock} = gen_tcp:listen(Port, [binary, {active, false}, {packet, http}]),
-  spawn_link(?MODULE, accepter_loop, [SPid, LSock]),
-  {ok, SPid}.
+  gen_server:cast(self(), accept),
+  {ok, #wsservstate{lsock = LSock, spid = SPid}}.
+
+handle_call(_Request, _From, State) ->
+  {ok, State}.
+
+%% 正常なメッセージを裁く関数
+%% ここからメッセージハンドラに流していく
+handle_info(?SOCK(Msg), S = #wsservstate{}) ->
+  WSDataFrame = decode_ws_dataframe(Msg),
+  io:format("received dataframe: ~p~n", [WSDataFrame]),
+  gen_server:cast(self(), wsrequest),
+  {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
+
+handle_info({tcp_closed, _CSock}, S = #wsservstate{}) ->
+  {stop, normal, S};
+
+handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
+  {stop, normal, S};
+
+handle_info(Msg, S) ->
+  io:format("unexpected msg: ~p~n", [Msg]),
+  {noreply, S}.
 
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
 %% ソケットの所有権の移譲をしないとポートが勝手に閉じる？
-accepter_loop(SPid, LSock) ->
+handle_cast(accept, S = #wsservstate{lsock = LSock, spid = SPid}) ->
   io:format("waiting for connection.~n"),
   {ok, CSock} = gen_tcp:accept(LSock),
+  % 別のwsservを１個起動しておく
+  mmmario_wsserv_sup:start_wsserv(),
   case do_handshake(CSock, maps:new()) of
-    {ok, _CSock} -> io:format("handshake passed.~n"),
-      inet:setopts(CSock, [{packet, raw}]),
-      CPid = spawn_link(?MODULE, client_loop, [SPid, CSock]),
-      gen_tcp:controlling_process(CSock, CPid),
-      accepter_loop(SPid, LSock);
-    _ -> accepter_loop(SPid, LSock)
-  end.
+    {ok, _} -> io:format("handshake passed.~n"),
+      inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
+      {noreply, S#wsservstate{csock = CSock}};
+    {stop, Reason, _} -> {stop, Reason, S};
+    _ -> {stop, "failed handshake with unknown reason", S}
+  end;
+
+%% テキストメッセージを処理
+handle_cast(
+    wsrequest,
+    S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
+) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_TEXT ->
+  Data = WSDataFrame#wsdataframe.data,
+  io:format("text data received: ~p~n", [Data]),
+  WillSendWSDataFrame = encode_ws_dataframe(Data, #{}),
+  io:format("send dataframe: ~p~n", [WillSendWSDataFrame]),
+  gen_tcp:send(CSock, WillSendWSDataFrame),
+  inet:setopts(CSock, [{active, once}]),
+  {noreply, S};
+
+%% クローズメッセージを処理
+handle_cast(
+    wsrequest,
+    S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
+) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_CLOSE ->
+  io:format("close request received~n"),
+  gen_tcp:close(CSock),
+  {stop, stop_request, S};
+
+%% PINGメッセージを処理
+handle_cast(
+    wsrequest,
+    S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
+) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_PING ->
+  io:format("ping request received~n"),
+  gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})),
+  {noreply, S}.
+
+terminate(Reason, State) ->
+  ok.
+
+code_change(OldVsn, State, Extra) ->
+  erlang:error(not_implemented).
+
+%% 開始メソッド。supervisorから起動される。ListenSocketはsupervisorから受け取る
+start_link(LSock) ->
+  gen_server:start_link(?MODULE, LSock, []).
 
 %% ハンドシェイク処理
 do_handshake(CSock, Headers) ->
@@ -94,14 +172,13 @@ do_handshake(CSock, Headers) ->
     {error, "\r\n"} -> do_handshake(CSock, Headers);
     {error, "\n"} -> do_handshake(CSock, Headers);
     {ok, http_eoh} -> % ヘッダが終了したらハンドシェイク処理に入る
-      verify_handshake(CSock, Headers);
-    _Others ->
-      io:format("Unknown data: ~p~n", [_Others]),
+      verify_handshake(CSock, Headers),
+      {ok, [{headers, Headers}]};
+    Others ->
+      io:format("Unknown msg: ~p~n", [Others]),
       io:format("Headers: ~p~n", [Headers]),
-      gen_tcp:close(CSock),
-      exit(normal)
-  end,
-  {ok, CSock}.
+      {stop, unknown_header, [{headers, Headers}, {msg, Others}]}
+  end.
 
 %% ヘッダー情報をまるっと受け取ったらここでヘッダーの内容をチェックし、大丈夫ならsend_handshakeを呼び出して
 %% openingハンドシェイクを送信する
@@ -111,16 +188,14 @@ verify_handshake(CSock, Headers) ->
   catch true = string:equal("upgrade", string:to_lower(maps:get({http_field, 'Connection'}))),
   catch true = string:equal("13", string:to_lower(maps:get({http_field, "Sec-Websocket-Version"}))),
   catch {ok, _} = maps:find({http_field, "Sec-Websocket-Key"}, Headers),
-  send_handshake(CSock, Headers),
-  {ok, CSock}.
+  send_handshake(CSock, Headers).
 
 %% openingハンドシェイクを送信する
 send_handshake(CSock, Headers) ->
   SWKey = maps:get({http_field, "Sec-Websocket-Key"}, Headers),
   AcceptHeaderValue = make_accept_header_value(SWKey),
   AcceptHeader = ?WEBSOCKET_PREFIX ++ AcceptHeaderValue ++ "\r\n\r\n",
-  gen_tcp:send(CSock, AcceptHeader),
-  {ok, CSock}.
+  gen_tcp:send(CSock, AcceptHeader).
 
 %% websocketのアクセプトヘッダの値を作る
 make_accept_header_value(SWKey) ->
@@ -131,41 +206,6 @@ make_accept_header_value(SWKey) ->
   % base64で符号化
   base64:encode_to_string(Digest).
 
-%% クライアントループ
-%% 受け取るパケットはすべてFIN=1だとする
-client_loop(SPid, CSock) ->
-  case gen_tcp:recv(CSock, 0) of
-
-    {ok, Packet} ->
-      WSDataFrame = decode_ws_dataframe(Packet),
-      io:format("received dataframe: ~p~n", [WSDataFrame]),
-
-      case WSDataFrame#wsdataframe.opcode of
-
-        ?OPCODE_TEXT ->
-          Data = WSDataFrame#wsdataframe.data,
-          io:format("text data received: ~p~n", [Data]),
-          WillSendWSDataFrame = encode_ws_dataframe(Data, #{}),
-          io:format("send dataframe: ~p~n", [WillSendWSDataFrame]),
-          gen_tcp:send(CSock, WillSendWSDataFrame), client_loop(SPid, CSock);
-
-        ?OPCODE_CLOSE ->
-          io:format("close request received~n"),
-          gen_tcp:close(CSock);
-
-        ?OPCODE_PING ->
-          io:format("ping request received~n"),
-          gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})), client_loop(SPid, CSock);
-
-        _Other -> erlang:error(unknown_opcode)
-      end;
-
-    {error, Reason} -> io:format("error Reason = ~p~n", [Reason]), exit(self(), Reason);
-
-    _ -> erlang:error(unknown_msg)
-
-  end.
-
 %% websocketのデータフレームをデコード
 decode_ws_dataframe(RawPacket) ->
   <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, OpCode:4, Mask:1, PayloadLen:7, RemainPacket/binary>> = RawPacket,
@@ -174,77 +214,46 @@ decode_ws_dataframe(RawPacket) ->
     io:format("PL NORMAL MASK ON~n"),
     {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket)),
     #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-      opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen, data = Data, rawpacket = RawPacket};
+      opcode = OpCode, mask = ?MASK_ON, maskkey = MaskKey, pllen = PayloadLen, data = Data, rawpacket = RawPacket};
 
     PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_OFF ->
       io:format("PL NORMAL MASK OFF~n"),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-        opcode = OpCode, maskkey = undefined, pllen = PayloadLen, data = RemainPacket, rawpacket = RawPacket};
+        opcode = OpCode, mask = ?MASK_OFF, maskkey = undefined,
+        pllen = PayloadLen, data = RemainPacket, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_16, Mask =:= ?MASK_ON ->
       io:format("PL EXTEND16 MASK ON~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_16(RemainPacket),
       {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket2)),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-        opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
+        opcode = OpCode, mask = ?MASK_ON, maskkey = MaskKey,
+        pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_16, Mask =:= ?MASK_OFF ->
       io:format("PL EXTEND16 MASK OFF~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_16(RemainPacket),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-        opcode = OpCode, maskkey = undefined, pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
+        opcode = OpCode, mask = ?MASK_OFF, maskkey = undefined,
+        pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_64, Mask =:= ?MASK_ON ->
       io:format("PL EXTEND64 MASK ON~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_64(RemainPacket),
       {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket2)),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-        opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
+        opcode = OpCode, mask = ?MASK_ON, maskkey = MaskKey,
+        pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_64, Mask =:= ?MASK_OFF ->
       io:format("PL EXTEND64 MASK OFF~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_64(RemainPacket),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-        opcode = OpCode, maskkey = undefined, pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
+        opcode = OpCode, mask = ?MASK_OFF, maskkey = undefined,
+        pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
 
     true -> erlang:error(unknown_payload_length)
   end.
-
-%% マスクキーの抽出
-extract_mask_key(RawPacket) ->
-  <<MaskKey:4/binary-unit:8, RemainPacket/binary>> = RawPacket,
-  {MaskKey, RemainPacket}.
-
-%% 16ビット分のペイロード長を抽出
-extract_extend_payload_length_16(RawPacket) ->
-  <<Length:16/unsigned-integer, RemainPacket/binary>> = RawPacket,
-  {Length, RemainPacket}.
-
-%% 64ビット分のペイロード長を抽出
-extract_extend_payload_length_64(RawPacket) ->
-  <<Length:64/unsigned-integer, RemainPacket/binary>> = RawPacket,
-  {Length, RemainPacket}.
-
-%% マスクキーの適用
-apply_mask_key({MaskKey, RawPacket}) ->
-  apply_mask_key(RawPacket, MaskKey).
-apply_mask_key(RawPacket, MaskKey) ->
-  % RawPacketのサイズに合わせてMaskKeyのサイクルリストを作っておく
-  RawPacketSize = byte_size(RawPacket),
-  <<MK1:8, MK2:8, MK3:8, MK4:8>> = MaskKey,
-  RawPacketSizeRemain = RawPacketSize rem 4,
-  RemainMaskKeyList = case RawPacketSizeRemain of
-                        1 -> [MK1];
-                        2 -> [MK1, MK2];
-                        3 -> [MK1, MK2, MK3];
-                        _ -> []
-                      end,
-  MaskKeyList = lists:flatten(lists:duplicate(trunc(RawPacketSize / 4), [MK1, MK2, MK3, MK4])) ++ RemainMaskKeyList,
-  RawPacketList = binary:bin_to_list(RawPacket),
-  {MaskKey, binary:list_to_bin(lists:flatten([[Val bxor Mask] ||
-    {Val, Mask} <- lists:zip(RawPacketList, MaskKeyList)]))}.
-%%   {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
-%%     <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawPacket]))}.
 
 
 %% データをwebsocketのデータフレームへエンコード
@@ -295,13 +304,54 @@ encode_ws_dataframe(Data, Opts) ->
     true -> erlang:error(unknown_payload_length)
   end.
 
+%%%-------------------------------------------------------------------
+%%% WebSocket用ユーティリティ関数
+%%%-------------------------------------------------------------------
+
+%% マスクキーの抽出
+extract_mask_key(RawPacket) ->
+  <<MaskKey:4/binary-unit:8, RemainPacket/binary>> = RawPacket,
+  {MaskKey, RemainPacket}.
+
+%% 16ビット分のペイロード長を抽出
+extract_extend_payload_length_16(RawPacket) ->
+  <<Length:16/unsigned-integer, RemainPacket/binary>> = RawPacket,
+  {Length, RemainPacket}.
+
+%% 64ビット分のペイロード長を抽出
+extract_extend_payload_length_64(RawPacket) ->
+  <<Length:64/unsigned-integer, RemainPacket/binary>> = RawPacket,
+  {Length, RemainPacket}.
+
+%% マスクキーの適用
+apply_mask_key({MaskKey, RawPacket}) ->
+  apply_mask_key(RawPacket, MaskKey).
+apply_mask_key(RawPacket, MaskKey) ->
+  % RawPacketのサイズに合わせてMaskKeyのサイクルリストを作っておく
+  RawPacketSize = byte_size(RawPacket),
+  <<MK1:8, MK2:8, MK3:8, MK4:8>> = MaskKey,
+  RawPacketSizeRemain = RawPacketSize rem 4,
+  RemainMaskKeyList = case RawPacketSizeRemain of
+                        1 -> [MK1];
+                        2 -> [MK1, MK2];
+                        3 -> [MK1, MK2, MK3];
+                        _ -> []
+                      end,
+  MaskKeyList = lists:flatten(lists:duplicate(trunc(RawPacketSize / 4), [MK1, MK2, MK3, MK4])) ++ RemainMaskKeyList,
+  RawPacketList = binary:bin_to_list(RawPacket),
+  {MaskKey, binary:list_to_bin(lists:flatten([[Val bxor Mask] ||
+    {Val, Mask} <- lists:zip(RawPacketList, MaskKeyList)]))}.
+%%   {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
+%%     <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawPacket]))}.
+
 
 %%%-------------------------------------------------------------------
 %%% テスト関数
 %%%-------------------------------------------------------------------
 mmmario_wsserv_test() ->
   PortNum = 8080,
-  {ok, SPid} = start(PortNum),
+  {ok, LSock} = gen_tcp:listen(8080, [binary, {active, false}, {packet, http}]),
+  {ok, SPid} = mmmario_wsserv:start_link(LSock),
   {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PortNum, [binary, {active, true}, {packet, http}]),
   InitialSampleRequestHeader = ""
     ++ "GET /resource HTTP/1.1\r\n"
@@ -344,3 +394,4 @@ encode_ws_dataframe_test(Data) ->
   WSDataFrame = mmmario_wsserv:encode_ws_dataframe(Data, #{mask => <<4, 5, 1, 4>>}),
   io:format("WS Dataframe: ~p~n", [WSDataFrame]),
   #wsdataframe{data = Data} = mmmario_wsserv:decode_ws_dataframe(WSDataFrame).
+
