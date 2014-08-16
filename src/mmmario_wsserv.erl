@@ -78,7 +78,8 @@ accepter_loop(SPid, LSock) ->
     {ok, _CSock} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}]),
       CPid = spawn_link(?MODULE, client_loop, [SPid, CSock]),
-      gen_tcp:controlling_process(CSock, CPid);
+      gen_tcp:controlling_process(CSock, CPid),
+      accepter_loop(SPid, LSock);
     _ -> accepter_loop(SPid, LSock)
   end.
 
