@@ -27,6 +27,10 @@
 -define(FIN_ON, 2#1).
 -define(FIN_OFF, 2#0).
 
+%% RSVグループ
+-define(RSV_ON, 2#1).
+-define(RSV_OFF, 2#0).
+
 %% OPCODE一覧
 -define(OPCODE_CONTINUE, 16#0).
 -define(OPCODE_TEXT, 16#1).
@@ -45,7 +49,15 @@
 -define(PAYLOAD_LENGTH_EXTEND_64, 10#127).
 
 %% WebSocketのデータフレームを格納するレコード
--record(wsdf, {fin, rsv1 = 0, rsv2 = 0, rsv3 = 0, opcode, mask, pl, maskkey, rawpacket})
+-record(wsdataframe, {
+  fin = ?FIN_OFF,
+  rsv1 = ?RSV_OFF, rsv2 = ?RSV_OFF, rsv3 = ?RSV_OFF,
+  opcode = ?OPCODE_TEXT,
+  mask = ?MASK_OFF,
+  pllen = 2#0,
+  maskkey = 2#0,
+  data,
+  rawpacket}).
 
 %% 開始メソッド。MMMarioサーバーを開始後、待ちループに入る。
 start(Port) ->
@@ -117,30 +129,138 @@ make_accept_header_value(SWKey) ->
   base64:encode_to_string(Digest).
 
 %% クライアントループ
+%% 受け取るパケットはすべてFIN=1だとする
 client_loop(SPid, CSock) ->
   case gen_tcp:recv(CSock, 0) of
+
     {ok, Packet} ->
-      io:format("packet is ~p~n", [Packet]),
-      {Fin, OpCode, Mask, PayloadLen, Data} = decode_ws_dataframe(Packet),
-      io:format("Data: ~p~n", [Data]),
-      io:format("PayloadLen: ~p~n", [PayloadLen]),
-      gen_tcp:send(CSock, encode_ws_dataframe(<<"t">>, {})), client_loop(SPid, CSock);
+      WSDataFrame = decode_ws_dataframe(Packet),
+      io:format("received dataframe: ~p~n", [WSDataFrame]),
+
+      case WSDataFrame#wsdataframe.opcode of
+
+        ?OPCODE_TEXT ->
+          Data = WSDataFrame#wsdataframe.data,
+          io:format("text data received: ~p~n", [Data]),
+          gen_tcp:send(CSock, encode_ws_dataframe(Data, #{})), client_loop(SPid, CSock);
+
+        ?OPCODE_CLOSE ->
+          io:format("close request received~n"),
+          gen_tcp:close(CSock);
+
+        _Other -> erlang:error(unknown_opcode)
+      end;
+
     {error, Reason} -> io:format("error Reason = ~p~n", [Reason]), exit(self(), Reason);
+
     _ -> erlang:error(unknown_msg)
+
   end.
 
 %% websocketのデータフレームをデコード
-decode_ws_dataframe(DataFrame) ->
-  <<Fin:1, _Rsvs:3, OpCode:4, Mask:1, PayloadLen:7, RemainDataFrame/binary>> = DataFrame,
-  {Fin, OpCode, Mask, PayloadLen, RemainDataFrame}.
+decode_ws_dataframe(RawPacket) ->
+  <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, OpCode:4, Mask:1, PayloadLen:7, RemainPacket/binary>> = RawPacket,
+
+  if PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_ON ->
+    {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket)),
+    #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+      opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen, data = Data, rawpacket = RawPacket};
+
+    PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_OFF ->
+      #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+        opcode = OpCode, maskkey = undefined, pllen = PayloadLen, data = RemainPacket, rawpacket = RawPacket};
+
+    PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_16, Mask =:= ?MASK_ON ->
+      {PayloadLen2, RemainPacket2} = extract_extend_payload_length_16(RemainPacket),
+      {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket2)),
+      #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+        opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
+
+    PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_16, Mask =:= ?MASK_OFF ->
+      {PayloadLen2, RemainPacket2} = extract_extend_payload_length_16(RemainPacket),
+      #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+        opcode = OpCode, maskkey = undefined, pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
+
+    PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_64, Mask =:= ?MASK_ON ->
+      {PayloadLen2, RemainPacket2} = extract_extend_payload_length_64(RemainPacket),
+      {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket2)),
+      #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+        opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
+
+    PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_64, Mask =:= ?MASK_OFF ->
+      {PayloadLen2, RemainPacket2} = extract_extend_payload_length_64(RemainPacket),
+      #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+        opcode = OpCode, maskkey = undefined, pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
+
+    true -> erlang:error(unknown_payload_length)
+  end.
+
+%% マスクキーの抽出
+extract_mask_key(RawPacket) ->
+  <<MaskKey:32, RemainPacket/binary>> = RawPacket,
+  {MaskKey, RemainPacket}.
+
+%% 16ビット分のペイロード長を抽出
+extract_extend_payload_length_16(RawPacket) ->
+  <<Length:16/unsigned-integer, RemainPacket/binary>> = RawPacket,
+  {Length, RemainPacket}.
+
+%% 64ビット分のペイロード長を抽出
+extract_extend_payload_length_64(RawPacket) ->
+  <<Length:64/unsigned-integer, RemainPacket/binary>> = RawPacket,
+  {Length, RemainPacket}.
+
+%% マスクキーの適用
+apply_mask_key({MaskKey, RawPacket}) ->
+  apply_mask_key(RawPacket, MaskKey).
+apply_mask_key(RawData, MaskKey) ->
+  <<MK1:8, MK2:8, MK3:8, MK4:8>> = MaskKey,
+  {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
+    <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawData]))}.
 
 %% データをwebsocketのデータフレームへエンコード
+% とりあえずデータは1メッセージに収まるという想定
 encode_ws_dataframe(Data, Opts) ->
-  % とりあえずデータは1メッセージに収まるという想定
-  FinRsvsOpCode = 2#10000000 bor 16#1,
   DataByteSize = byte_size(Data),
-  MaskPayloadLength = 2#00000000 bor DataByteSize,
-  <<FinRsvsOpCode, MaskPayloadLength, Data/binary>>.
+  FinRsvsOpCode = 2#10000000 bor 16#1,
+
+  {{MaskKey, NewData}, MaskOnOffBits} = case maps:find(mask, Opts) of
+                                          {ok, aMaskKey} ->
+                                            {apply_mask_key(Data, aMaskKey), 2#10000000};
+                                          _Other -> {{undefined, Data}, 2#00000000}
+                                        end,
+
+  if DataByteSize =< ?PAYLOAD_LENGTH_NORMAL, MaskKey =:= undefined ->
+    MaskPayloadLength = MaskOnOffBits bor DataByteSize,
+    <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
+
+    DataByteSize =< ?PAYLOAD_LENGTH_NORMAL ->
+      MaskPayloadLength = MaskOnOffBits bor DataByteSize,
+      <<FinRsvsOpCode, MaskPayloadLength, MaskKey:16, NewData/binary>>;
+
+    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_16, MaskKey =:= undefined ->
+      BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_16,
+      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:16/unsigned-integer>>,
+      <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
+
+    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_16 ->
+      BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_16,
+      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:16/unsigned-integer>>,
+      <<FinRsvsOpCode, MaskPayloadLength, MaskKey:16, NewData/binary>>;
+
+    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_64, MaskKey =:= undefined ->
+      BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_64,
+      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:64/unsigned-integer>>,
+      <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
+
+    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_64 ->
+      BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_64,
+      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:64/unsigned-integer>>,
+      <<FinRsvsOpCode, MaskPayloadLength, MaskKey, NewData/binary>>;
+
+    true -> erlang:error(unknown_payload_length)
+  end.
+
 
 %%%-------------------------------------------------------------------
 %%% テスト関数
@@ -175,7 +295,7 @@ mmmario_wsserv_test_loop(Socket) ->
   end.
 
 mmmario_wsserv_test_msg_loop(Socket) ->
-  gen_tcp:send(Socket, encode_ws_dataframe(<<"test">>, {})),
+  gen_tcp:send(Socket, encode_ws_dataframe(<<"test">>, #{})),
   receive
     All -> io:format("Recv: ~p~n", [All])
   end.
@@ -187,6 +307,6 @@ make_accept_header_value_test() ->
   "7eQChgCtQMnVILefJAO6dK5JwPc=" = AcceptHeaderValue.
 
 encode_ws_dataframe_test(Data) ->
-  WSDataFrame = mmmario_wsserv:encode_ws_dataframe(Data, {}),
+  WSDataFrame = mmmario_wsserv:encode_ws_dataframe(Data, #{mask => <<4, 5, 1, 4>>}),
   io:format("WS Dataframe: ~p~n", [WSDataFrame]),
-  {1, 1, 0, 4, <<"test">>} = mmmario_wsserv:decode_ws_dataframe(WSDataFrame).
+  #wsdataframe{data = Data} = mmmario_wsserv:decode_ws_dataframe(WSDataFrame).
