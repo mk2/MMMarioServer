@@ -162,32 +162,38 @@ decode_ws_dataframe(RawPacket) ->
   <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, OpCode:4, Mask:1, PayloadLen:7, RemainPacket/binary>> = RawPacket,
 
   if PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_ON ->
+    io:format("PL NORMAL MASK ON~n"),
     {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket)),
     #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
       opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen, data = Data, rawpacket = RawPacket};
 
     PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_OFF ->
+      io:format("PL NORMAL MASK OFF~n"),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
         opcode = OpCode, maskkey = undefined, pllen = PayloadLen, data = RemainPacket, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_16, Mask =:= ?MASK_ON ->
+      io:format("PL EXTEND16 MASK ON~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_16(RemainPacket),
       {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket2)),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
         opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_16, Mask =:= ?MASK_OFF ->
+      io:format("PL EXTEND16 MASK OFF~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_16(RemainPacket),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
         opcode = OpCode, maskkey = undefined, pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_64, Mask =:= ?MASK_ON ->
+      io:format("PL EXTEND64 MASK ON~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_64(RemainPacket),
       {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainPacket2)),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
         opcode = OpCode, maskkey = MaskKey, pllen = PayloadLen2, data = Data, rawpacket = RawPacket};
 
     PayloadLen =:= ?PAYLOAD_LENGTH_EXTEND_64, Mask =:= ?MASK_OFF ->
+      io:format("PL EXTEND64 MASK OFF~n"),
       {PayloadLen2, RemainPacket2} = extract_extend_payload_length_64(RemainPacket),
       #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
         opcode = OpCode, maskkey = undefined, pllen = PayloadLen2, data = RemainPacket2, rawpacket = RawPacket};
@@ -197,7 +203,7 @@ decode_ws_dataframe(RawPacket) ->
 
 %% マスクキーの抽出
 extract_mask_key(RawPacket) ->
-  <<MaskKey:32, RemainPacket/binary>> = RawPacket,
+  <<MaskKey:4/binary-unit:8, RemainPacket/binary>> = RawPacket,
   {MaskKey, RemainPacket}.
 
 %% 16ビット分のペイロード長を抽出
@@ -213,10 +219,24 @@ extract_extend_payload_length_64(RawPacket) ->
 %% マスクキーの適用
 apply_mask_key({MaskKey, RawPacket}) ->
   apply_mask_key(RawPacket, MaskKey).
-apply_mask_key(RawData, MaskKey) ->
+apply_mask_key(RawPacket, MaskKey) ->
+  % RawPacketのサイズに合わせてMaskKeyのサイクルリストを作っておく
+  RawPacketSize = byte_size(RawPacket),
   <<MK1:8, MK2:8, MK3:8, MK4:8>> = MaskKey,
-  {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
-    <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawData]))}.
+  RawPacketSizeRemain = RawPacketSize rem 4,
+  RemainMaskKeyList = case RawPacketSizeRemain of
+                        1 -> [MK1];
+                        2 -> [MK1, MK2];
+                        3 -> [MK1, MK2, MK3];
+                        _ -> []
+                      end,
+  MaskKeyList = lists:flatten(lists:duplicate(trunc(RawPacketSize / 4), [MK1, MK2, MK3, MK4])) ++ RemainMaskKeyList,
+  RawPacketList = binary:bin_to_list(RawPacket),
+  {MaskKey, binary:list_to_bin(lists:flatten([[Val bxor Mask] ||
+    {Val, Mask} <- lists:zip(RawPacketList, MaskKeyList)]))}.
+%%   {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
+%%     <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawPacket]))}.
+
 
 %% データをwebsocketのデータフレームへエンコード
 % とりあえずデータは1メッセージに収まるという想定
