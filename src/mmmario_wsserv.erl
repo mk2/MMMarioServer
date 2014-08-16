@@ -106,7 +106,6 @@ handle_info(Msg, S) ->
   {noreply, S}.
 
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
-%% ソケットの所有権の移譲をしないとポートが勝手に閉じる？
 handle_cast(accept, S = #wsservstate{lsock = LSock, spid = SPid}) ->
   io:format("waiting for connection.~n"),
   {ok, CSock} = gen_tcp:accept(LSock),
@@ -127,9 +126,9 @@ handle_cast(
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_TEXT ->
   Data = WSDataFrame#wsdataframe.data,
   io:format("text data received: ~p~n", [Data]),
-  WillSendWSDataFrame = encode_ws_dataframe(Data, #{}),
-  io:format("send dataframe: ~p~n", [WillSendWSDataFrame]),
-  gen_tcp:send(CSock, WillSendWSDataFrame),
+  SendWSDataFrame = encode_ws_dataframe(Data, #{}),
+  io:format("send dataframe: ~p~n", [SendWSDataFrame]),
+  gen_tcp:send(CSock, SendWSDataFrame),
   inet:setopts(CSock, [{active, once}]),
   {noreply, S};
 
@@ -153,7 +152,7 @@ handle_cast(
   {noreply, S}.
 
 terminate(Reason, State) ->
-  ok.
+  {stop, Reason, State}.
 
 code_change(OldVsn, State, Extra) ->
   erlang:error(not_implemented).
