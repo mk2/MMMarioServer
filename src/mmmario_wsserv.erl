@@ -47,6 +47,8 @@
 -define(PAYLOAD_LENGTH_NORMAL, 10#125).
 -define(PAYLOAD_LENGTH_EXTEND_16, 10#126).
 -define(PAYLOAD_LENGTH_EXTEND_64, 10#127).
+-define(MAX_UNSIGNED_INTEGER_16, 65532).
+-define(MAX_UNSIGNED_INTEGER_64, 9223372036854775807).
 
 %% WebSocketのデータフレームを格納するレコード
 -record(wsdataframe, {
@@ -142,11 +144,17 @@ client_loop(SPid, CSock) ->
         ?OPCODE_TEXT ->
           Data = WSDataFrame#wsdataframe.data,
           io:format("text data received: ~p~n", [Data]),
-          gen_tcp:send(CSock, encode_ws_dataframe(Data, #{})), client_loop(SPid, CSock);
+          WillSendWSDataFrame = encode_ws_dataframe(Data, #{}),
+          io:format("send dataframe: ~p~n", [WillSendWSDataFrame]),
+          gen_tcp:send(CSock, WillSendWSDataFrame), client_loop(SPid, CSock);
 
         ?OPCODE_CLOSE ->
           io:format("close request received~n"),
           gen_tcp:close(CSock);
+
+        ?OPCODE_PING ->
+          io:format("ping request received~n"),
+          gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})), client_loop(SPid, CSock);
 
         _Other -> erlang:error(unknown_opcode)
       end;
@@ -242,41 +250,46 @@ apply_mask_key(RawPacket, MaskKey) ->
 % とりあえずデータは1メッセージに収まるという想定
 encode_ws_dataframe(Data, Opts) ->
   DataByteSize = byte_size(Data),
-  FinRsvsOpCode = 2#10000000 bor 16#1,
+  FinRsvsOpCode = case maps:find(opcode, Opts) of
+                    {ok, ?OPCODE_PONG} -> 2#10000000 bor ?OPCODE_PONG;
+                    _Other -> 2#10000000 bor ?OPCODE_TEXT
+                  end,
 
   {{MaskKey, NewData}, MaskOnOffBits} = case maps:find(mask, Opts) of
                                           {ok, aMaskKey} ->
                                             {apply_mask_key(Data, aMaskKey), 2#10000000};
-                                          _Other -> {{undefined, Data}, 2#00000000}
+                                          _ -> {{undefined, Data}, 2#00000000}
                                         end,
 
   if DataByteSize =< ?PAYLOAD_LENGTH_NORMAL, MaskKey =:= undefined ->
+    io:format("PL NORMAL MASK OFF~n"),
     MaskPayloadLength = MaskOnOffBits bor DataByteSize,
     <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
 
     DataByteSize =< ?PAYLOAD_LENGTH_NORMAL ->
+      io:format("PL NORMAL MASK ON~n"),
       MaskPayloadLength = MaskOnOffBits bor DataByteSize,
       <<FinRsvsOpCode, MaskPayloadLength, MaskKey:16, NewData/binary>>;
 
-    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_16, MaskKey =:= undefined ->
+    ?PAYLOAD_LENGTH_NORMAL < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_16, MaskKey =:= undefined ->
+      io:format("PL EXTEND16 MASK OFF~n"),
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_16,
-      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:16/unsigned-integer>>,
-      <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
+      <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:2/unsigned-integer-unit:8, NewData/binary>>;
 
-    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_16 ->
+    ?PAYLOAD_LENGTH_NORMAL < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_16 ->
+      io:format("PL EXTEND16 MASK ON~n"),
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_16,
-      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:16/unsigned-integer>>,
-      <<FinRsvsOpCode, MaskPayloadLength, MaskKey:16, NewData/binary>>;
+      <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:2/unsigned-integer-unit:8, MaskKey:16, NewData/binary>>;
 
-    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_64, MaskKey =:= undefined ->
+    ?PAYLOAD_LENGTH_NORMAL < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_64, MaskKey =:= undefined ->
+      io:format("PL EXTEND64 MASK OFF~n"),
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_64,
-      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:64/unsigned-integer>>,
-      <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
+      <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:8/unsigned-integer-unit:8, NewData/binary>>;
 
-    DataByteSize =:= ?PAYLOAD_LENGTH_EXTEND_64 ->
+    ?PAYLOAD_LENGTH_NORMAL < DataByteSize, DataByteSize =< ?MAX_UNSIGNED_INTEGER_64 ->
+      io:format("PL EXTEND64 MASK ON~n"),
       BaseMaskPayloadLength = MaskOnOffBits bor ?PAYLOAD_LENGTH_EXTEND_64,
-      MaskPayloadLength = <<BaseMaskPayloadLength, DataByteSize:64/unsigned-integer>>,
-      <<FinRsvsOpCode, MaskPayloadLength, MaskKey, NewData/binary>>;
+      <<FinRsvsOpCode, BaseMaskPayloadLength, DataByteSize:8/unsigned-integer-unit:8, MaskKey:16, NewData/binary>>;
 
     true -> erlang:error(unknown_payload_length)
   end.
