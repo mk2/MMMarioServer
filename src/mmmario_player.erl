@@ -16,7 +16,7 @@
 %%%%%%%%%%%% RELEASE %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
--export([start_link/2, move_player/2]).
+-export([start_link/2, move_player/2, get_pos/1]).
 %% 状態関数
 -export([move/2]).
 %% gen_fsm callbacks
@@ -57,6 +57,9 @@ start_link(WSServPid, Name) ->
 move_player(PPid, XY = {_, _}) ->
   gen_fsm:send_event(PPid, {move, XY}).
 
+get_pos(PPid) ->
+  gen_fsm:sync_send_all_state_event(PPid, get_pos).
+
 %%%===================================================================
 %%% gen_fsm callbacks
 %%%===================================================================
@@ -82,6 +85,9 @@ state_name(_Event, _From, S) ->
 
 handle_event(_Event, SName, S) ->
   {next_state, SName, S}.
+
+handle_sync_event(get_pos, _From, SName, S = #pstate{pos = Pos}) ->
+  {reply, Pos, SName, S};
 
 handle_sync_event(_Event, _From, SName, S) ->
   Reply = ok,
