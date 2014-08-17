@@ -20,8 +20,9 @@ start_link() ->
 init([]) ->
   MaxR = 60,
   MaxT = 3600,
-  % パッシブモードなのは、とりあえずハンドシェイク時はパッシブにやりたいから。
+  % パッシブモードなのは、とりあえず開始時のハンドシェイクはパッシブにやりたいから。
   {ok, LSock} = gen_tcp:listen(8080, [binary, {active, false}, {packet, http}]),
+  % あらかじめ待機状態にあるwsservを生成しておく。
   spawn_link(fun empty_wsservs/0),
   {ok, {{simple_one_for_one, MaxR, MaxT},
     [{

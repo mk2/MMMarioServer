@@ -6,3 +6,8 @@
   {i, "src"},
   {i, "include"},
   {outdir, "ebin"}]}.
+{'test/*', [
+  debug_info,
+  {i, "test"},
+  {i, "include"},
+  {outdir, "ebin"}]}.

@@ -13,8 +13,10 @@
 -author("lycaon").
 
 -ifndef(DEBUG).
-%% API
--export([start_link/1]).
+%% APIs
+%% 公開API
+-export([start_link/1, send/2]).
+%% gen_serverコールバックAPI
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -else.
 %% デバッグ用エクスポート
@@ -71,19 +73,34 @@
 -record(wsservstate, {
   lsock,
   csock,
-  spid,
+  ppid, % Player FSMのPid
   wsdataframe = #wsdataframe{}
 }).
+
+%%%-------------------------------------------------------------------
+%%% 公開API
+%%%-------------------------------------------------------------------
+
+%% 開始メソッド。supervisorから起動される。ListenSocketはsupervisorから受け取る
+start_link(LSock) ->
+  gen_server:start_link(?MODULE, LSock, []).
+
+%% データ送信メソッド
+send(Pid, Data) ->
+  gen_server:cast(Pid, {data, Data}).
 
 %%%-------------------------------------------------------------------
 %%% gen_server コールバック
 %%%-------------------------------------------------------------------
 
+%% gen_serverコールバック
+%% accept処理をここでやらずにcastしてるのは、accept処理中はポーリング状態になるため。{ok, _}をすぐに返さないと怒られる希ガス
 init(LSock) ->
-  SPid = undefined,
   gen_server:cast(self(), accept),
-  {ok, #wsservstate{lsock = LSock, spid = SPid}}.
+  {ok, #wsservstate{lsock = LSock}}.
 
+%% 同期呼び出し
+%% 今のところ使う予定はないが、内部的にwsservを呼ぶときに使ったほうがよい？
 handle_call(_Request, _From, State) ->
   {ok, State}.
 
@@ -95,18 +112,22 @@ handle_info(?SOCK(Msg), S = #wsservstate{}) ->
   gen_server:cast(self(), wsrequest),
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
+%% エラー処理
+%%
 handle_info({tcp_closed, _CSock}, S = #wsservstate{}) ->
   {stop, normal, S};
-
 handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
   {stop, normal, S};
 
+%% 未知のメッセージ処理
+%% 無視して別のメッセージを待つ
 handle_info(Msg, S) ->
   io:format("unexpected msg: ~p~n", [Msg]),
   {noreply, S}.
 
+%% TCPアクセプトを処理する関数
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
-handle_cast(accept, S = #wsservstate{lsock = LSock, spid = SPid}) ->
+handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   io:format("waiting for connection.~n"),
   {ok, CSock} = gen_tcp:accept(LSock),
   % 別のwsservを１個起動しておく
@@ -114,12 +135,14 @@ handle_cast(accept, S = #wsservstate{lsock = LSock, spid = SPid}) ->
   case do_handshake(CSock, maps:new()) of
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
-      {noreply, S#wsservstate{csock = CSock}};
+      {ok, PPid} = mmmario:join_player(self(), "test"), % キャラクターのFSMを起動しておく
+      {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
     {stop, Reason, _} -> {stop, Reason, S};
     _ -> {stop, "failed handshake with unknown reason", S}
   end;
 
 %% テキストメッセージを処理
+%%
 handle_cast(
     wsrequest,
     S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
@@ -133,15 +156,17 @@ handle_cast(
   {noreply, S};
 
 %% クローズメッセージを処理
+%% Socketはterminateの方で閉じる？
 handle_cast(
     wsrequest,
     S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_CLOSE ->
   io:format("close request received~n"),
   gen_tcp:close(CSock),
-  {stop, stop_request, S};
+  {stop, close_request, S};
 
 %% PINGメッセージを処理
+%% PONGを返す
 handle_cast(
     wsrequest,
     S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
@@ -149,17 +174,34 @@ handle_cast(
   io:format("ping request received~n"),
   gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})),
   inet:setopts(CSock, [{active, once}]),
-  {noreply, S}.
+  {noreply, S};
 
-terminate(Reason, State) ->
-  {stop, Reason, State}.
+%% 任意のデータ送信。send/2経由で使う
+%% 今のところOpCodeはTEXTになる
+handle_cast(
+    {data, Data},
+    S = #wsservstate{csock = CSock}
+) ->
+  io:format("data will be sent: ~p~n", [Data]),
+  WSDataFrame = encode_ws_dataframe(Data, {}),
+  gen_tcp:send(CSock, WSDataFrame),
+  {ok, S#wsservstate{wsdataframe = WSDataFrame}}.
 
+%% gen_serverコールバック
+%% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
+terminate(Reason, S = #wsservstate{csock = CSock}) ->
+  io:format("terminating: ~p~n", [Reason]),
+  gen_tcp:close(CSock),
+  {stop, Reason, S}.
+
+%% gen_serverコールバック
+%%
 code_change(OldVsn, State, Extra) ->
   erlang:error(not_implemented).
 
-%% 開始メソッド。supervisorから起動される。ListenSocketはsupervisorから受け取る
-start_link(LSock) ->
-  gen_server:start_link(?MODULE, LSock, []).
+%%%-------------------------------------------------------------------
+%%% 内部的に使う関数
+%%%-------------------------------------------------------------------
 
 %% ハンドシェイク処理
 do_handshake(CSock, Headers) ->
@@ -348,42 +390,6 @@ apply_mask_key(RawMsg, MaskKey) ->
 %%%-------------------------------------------------------------------
 %%% テスト関数
 %%%-------------------------------------------------------------------
-mmmario_wsserv_test() ->
-  PortNum = 8080,
-  {ok, LSock} = gen_tcp:listen(8080, [binary, {active, false}, {packet, http}]),
-  {ok, SPid} = mmmario_wsserv:start_link(LSock),
-  {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PortNum, [binary, {active, true}, {packet, http}]),
-  InitialSampleRequestHeader = ""
-    ++ "GET /resource HTTP/1.1\r\n"
-    ++ "Host: localhost\r\n"
-    ++ "Upgrade: websocket\r\n"
-    ++ "Connection: upgrade\r\n"
-    ++ "Sec-Websocket-Version: 13\r\n"
-    ++ "Sec-Websocket-Key: E4WSEcseoWr4csPLS2QJHA==\r\n"
-    ++ "\r\n",
-  gen_tcp:send(Socket, InitialSampleRequestHeader),
-  mmmario_wsserv_test_loop(Socket).
-
-mmmario_wsserv_test_loop(Socket) ->
-  receive
-    {tcp, _Port, Msg} -> io:format("msg = ~p~n", [Msg]), mmmario_wsserv_test_loop(Socket);
-    {http, _Port, {http_response, _Version, Status, Msg}} ->
-      io:format("response status: ~p   msg: ~p~n", [Status, Msg]), mmmario_wsserv_test_loop(Socket);
-    {http, _Port, {http_header, _Version, Header, _, Value}} ->
-      io:format("header header: ~p   value: ~p~n", [Header, Value]), mmmario_wsserv_test_loop(Socket);
-    {http, _Port, http_eoh} ->
-      io:format("All headers recieved.~n"),
-      inet:setopts(Socket, [{packet, raw}]),
-      mmmario_wsserv_test_msg_loop(Socket);
-    What -> io:format("what = ~p~n", [What]), erlang:error(What)
-  end.
-
-mmmario_wsserv_test_msg_loop(Socket) ->
-  gen_tcp:send(Socket, encode_ws_dataframe(<<"test">>, #{})),
-  receive
-    All -> io:format("Recv: ~p~n", [All])
-  end.
-
 make_accept_header_value_test() ->
   SWKey = "E4WSEcseoWr4csPLS2QJHA==",
   AcceptHeaderValue = make_accept_header_value(SWKey),
