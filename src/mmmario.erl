@@ -23,7 +23,6 @@ start(_StartType, _StartArgs) ->
 stop(State) ->
   erlang:error(not_implemented).
 
-
 new_player(WSServPid, Name) ->
   io:format("WSServPid: ~p~n", [WSServPid]),
   mmmario_player_sup:start_player(WSServPid, Name).

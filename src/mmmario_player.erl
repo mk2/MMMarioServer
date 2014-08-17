@@ -50,7 +50,8 @@
 %% 開始メソッド
 %% WSServPidはその名の通り、mmmario_wsservのpid
 start_link(WSServPid, Name) ->
-  gen_fsm:start_link({local, ?SERVER}, ?MODULE, [WSServPid, Name], []).
+  io:format("WSServPid: ~p Name: ~p~n", [WSServPid, Name]),
+  gen_fsm:start_link(?MODULE, [WSServPid, Name], []).
 
 %% プレイヤーを動かす
 move_player(PPid, XY = {_, _}) ->
@@ -65,13 +66,14 @@ move_player(PPid, XY = {_, _}) ->
 init([WSServPid, Name]) ->
   io:format("WSServPid: ~p~n", [WSServPid]),
   io:format("Name: ~p~n", [Name]),
-  %HandlerId = mmmario_event_handler:add_handler(mmmario_event_handler),
-  {ok, move, #pstate{wsservpid = WSServPid, name = Name}}.
+  HandlerId = mmmario_event_handler:add_handler(mmmario_event_handler),
+  {ok, move, #pstate{wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
 
 %% 動作可能状態
 %% moveイベントが来たらmove状態へ移動
 move({move, {X, Y}}, S = #pstate{}) ->
   io:format("new posX: ~p posY: ~p~n", [X, Y]),
+  gen_event:notify(mmmario_event_handler, update_chara_pos),
   {next_state, move, S#pstate{pos = {X, Y}}}.
 
 state_name(_Event, _From, S) ->
