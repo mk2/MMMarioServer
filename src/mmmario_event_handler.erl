@@ -53,10 +53,8 @@ remove_handler(HandlerId) ->
 init([]) ->
   {ok, #evtstate{}}.
 
-handle_event(update_chara_pos, S) ->
-  io:format("event fired!~n"),
+handle_event({update_chara_pos, Name}, S) ->
   Children = mmmario_player_sup:children(),
-  io:format("children: ~p~n", [Children]),
   CPoss = [mmmario_player:get_pos(PPid) || {_, PPid, _, _} <- Children],
   io:format("CPoss: ~p~n", [CPoss]),
   {ok, S};

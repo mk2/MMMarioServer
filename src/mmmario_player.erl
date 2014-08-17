@@ -67,16 +67,14 @@ get_pos(PPid) ->
 %% 初期化
 %% 初期化後はidle状態にしてプレイヤーからのイベントを待つ
 init([WSServPid, Name]) ->
-  io:format("WSServPid: ~p~n", [WSServPid]),
-  io:format("Name: ~p~n", [Name]),
   HandlerId = mmmario_event_handler:add_handler(),
   {ok, move, #pstate{wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
 
 %% 動作可能状態
 %% moveイベントが来たらmove状態へ移動
-move({move, {X, Y}}, S = #pstate{}) ->
+move({move, {X, Y}}, S = #pstate{name = Name}) ->
   io:format("new posX: ~p posY: ~p~n", [X, Y]),
-  gen_event:notify(mmmario_event_handler, update_chara_pos),
+  gen_event:notify(mmmario_event_handler, {update_chara_pos, Name}),
   {next_state, move, S#pstate{pos = {X, Y}}}.
 
 state_name(_Event, _From, S) ->
@@ -86,8 +84,8 @@ state_name(_Event, _From, S) ->
 handle_event(_Event, SName, S) ->
   {next_state, SName, S}.
 
-handle_sync_event(get_pos, _From, SName, S = #pstate{pos = Pos}) ->
-  {reply, Pos, SName, S};
+handle_sync_event(get_pos, _From, SName, S = #pstate{pos = Pos, name = Name}) ->
+  {reply, {Name, Pos}, SName, S};
 
 handle_sync_event(_Event, _From, SName, S) ->
   Reply = ok,

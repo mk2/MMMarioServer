@@ -27,7 +27,6 @@ start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 start_player(WSServPid, Name) ->
-  io:format("WSServPid: ~p~n", [WSServPid]),
   supervisor:start_child(?SERVER, [WSServPid, Name]). % simple_one_for_oneだとArgsの部分が自動で子に渡されるらしい
 
 children() ->
