@@ -69,7 +69,7 @@ get_pos(PPid) ->
 init([WSServPid, Name]) ->
   io:format("WSServPid: ~p~n", [WSServPid]),
   io:format("Name: ~p~n", [Name]),
-  HandlerId = mmmario_event_handler:add_handler(mmmario_event_handler),
+  HandlerId = mmmario_event_handler:add_handler(),
   {ok, move, #pstate{wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
 
 %% 動作可能状態
@@ -98,6 +98,7 @@ handle_info(_Info, SName, S) ->
 
 terminate(Reason, _SName, S = #pstate{ehdlr = HandlerId}) ->
   io:format("terminating with: ~p~n", [Reason]),
+  mmmario_event_handler:remove_handler(HandlerId),
   ok.
 
 code_change(_OldVsn, SName, S, _Extra) ->

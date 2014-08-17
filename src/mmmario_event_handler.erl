@@ -14,8 +14,8 @@
 %% API
 -export([
   start_link/0,
-  add_handler/1,
-  remove_handler/2
+  add_handler/0,
+  remove_handler/1
 ]).
 
 %% gen_event callbacks
@@ -37,14 +37,14 @@
 start_link() ->
   gen_event:start_link({local, ?SERVER}).
 
-add_handler(Pid) ->
+add_handler() ->
   HandlerId = {?MODULE, make_ref()},
-  gen_event:add_handler(Pid, HandlerId, []),
+  gen_event:add_handler(?SERVER, HandlerId, []),
   HandlerId.
 
-remove_handler(Pid, HandlerId) ->
-  gen_event:delete_handler(Pid, HandlerId, []),
-  HandlerId.
+remove_handler(HandlerId) ->
+  gen_event:delete_handler(?SERVER, HandlerId, []),
+  ok.
 
 %%%===================================================================
 %%% gen_event callbacks
