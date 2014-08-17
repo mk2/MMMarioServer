@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_player/2]).
+-export([start_link/0, start_player/2, children/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -27,7 +27,11 @@ start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 start_player(WSServPid, Name) ->
-  supervisor:start_child(?MODULE, [WSServPid, Name]). % simple_one_for_oneだとArgsの部分が自動で子に渡されるらしい
+  io:format("WSServPid: ~p~n", [WSServPid]),
+  supervisor:start_child(?SERVER, [WSServPid, Name]). % simple_one_for_oneだとArgsの部分が自動で子に渡されるらしい
+
+children() ->
+  supervisor:which_children(?SERVER).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -42,10 +46,9 @@ init([]) ->
 
   Restart = temporary,
   Shutdown = 2000,
-  Type = worker,
 
   Player = {mmmario_player, {mmmario_player, start_link, []},
-    Restart, Shutdown, Type, [mmmario_player]},
+    Restart, Shutdown, worker, [mmmario_player]},
 
   {ok, {SupFlags, [Player]}}.
 

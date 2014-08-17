@@ -145,7 +145,10 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   case do_handshake(CSock, maps:new()) of
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
-      {ok, PPid} = mmmario:join_player(self(), make_ref()), % キャラクターのFSMを起動しておく
+      SelfPid = self(),
+      io:format("self pid: ~p~n", [SelfPid]),
+      {ok, PPid} = mmmario:new_player(self(), make_ref()), % キャラクターのFSMを起動しておく
+      io:format("PPid: ~p~n", [PPid]),
       {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
     {stop, Reason, _} -> {stop, Reason, S};
     _ -> {stop, "failed handshake with unknown reason", S}
@@ -200,9 +203,10 @@ handle_cast(
 
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
-terminate(Reason, S = #wsservstate{csock = CSock}) ->
+terminate(Reason, S = #wsservstate{csock = CSock, ppid = PPid}) ->
   io:format("terminating: ~p~n", [Reason]),
   gen_tcp:close(CSock),
+  exit(PPid, normal),
   {stop, Reason, S}.
 
 %% gen_serverコールバック

@@ -46,7 +46,10 @@ init([]) ->
   WSServSup = {mmmario_wsserv_sup, {mmmario_wsserv_sup, start_link, []},
     Restart, Shutdown, supervisor, [mmmario_wsserv_sup]},
 
-  {ok, {SupFlags, [PlayerSup, WSServSup]}}.
+  EvtMgr = {{local, mmmario_event_handler}, {mmmario_event_handler, start_link, []},
+    Restart, Shutdown, worker, [mmmario_event_handler]},
+
+  {ok, {SupFlags, [PlayerSup, WSServSup, EvtMgr]}}.
 
 %%%===================================================================
 %%% Internal functions

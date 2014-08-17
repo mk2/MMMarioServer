@@ -12,8 +12,11 @@
 -behaviour(gen_event).
 
 %% API
--export([start_link/0,
-  add_handler/0]).
+-export([
+  start_link/0,
+  add_handler/1,
+  remove_handler/2
+]).
 
 %% gen_event callbacks
 -export([init/1,
@@ -25,7 +28,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+-record(evtstate, {}).
 
 %%%===================================================================
 %%% gen_event callbacks
@@ -34,31 +37,42 @@
 start_link() ->
   gen_event:start_link({local, ?SERVER}).
 
-add_handler() ->
-  gen_event:add_handler(?SERVER, ?MODULE, []).
+add_handler(Pid) ->
+  HandlerId = {?MODULE, make_ref()},
+  gen_event:add_handler(Pid, HandlerId, []),
+  HandlerId.
+
+remove_handler(Pid, HandlerId) ->
+  gen_event:delete_handler(Pid, HandlerId, []),
+  HandlerId.
 
 %%%===================================================================
 %%% gen_event callbacks
 %%%===================================================================
 
 init([]) ->
-  {ok, #state{}}.
+  {ok, #evtstate{}}.
 
-handle_event(_Event, State) ->
-  {ok, State}.
+handle_event(update_chara_pos, S) ->
+  io:format("event fired!~n"),
+  Children = mmmario_player_sup:children(),
+  io:format("children: ~p~n", [Children]),
+  {ok, S};
+handle_event(_Event, S) ->
+  {ok, S}.
 
-handle_call(_Request, State) ->
+handle_call(_Request, S) ->
   Reply = ok,
-  {ok, Reply, State}.
+  {ok, Reply, S}.
 
-handle_info(_Info, State) ->
-  {ok, State}.
+handle_info(_Info, S) ->
+  {ok, S}.
 
-terminate(_Arg, _State) ->
+terminate(_Arg, _S) ->
   ok.
 
-code_change(_OldVsn, State, _Extra) ->
-  {ok, State}.
+code_change(_OldVsn, S, _Extra) ->
+  {ok, S}.
 
 %%%===================================================================
 %%% Internal functions
