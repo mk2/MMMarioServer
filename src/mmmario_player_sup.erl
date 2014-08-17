@@ -44,10 +44,10 @@ init([]) ->
   Shutdown = 2000,
   Type = worker,
 
-  AChild = {mmmario_player, {mmmario_player, start_link, []},
+  Player = {mmmario_player, {mmmario_player, start_link, []},
     Restart, Shutdown, Type, [mmmario_player]},
 
-  {ok, {SupFlags, [AChild]}}.
+  {ok, {SupFlags, [Player]}}.
 
 %%%===================================================================
 %%% Internal functions

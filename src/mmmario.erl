@@ -27,5 +27,5 @@ stop(State) ->
 join_player(WSServPid, Name) ->
   mmmario_player_sup:start_player(WSServPid, Name).
 
-move_player(PPid, pos = {_, _}) ->
-  mmmario_player:move_player(PPid, pos).
+move_player(PPid, Pos = {_, _}) ->
+  mmmario_player:move_player(PPid, Pos).

@@ -50,8 +50,9 @@ start_link(WSServPid, Name) ->
   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [WSServPid, Name], []).
 
 %% プレイヤーを動かす
-move_player(PPid, Dxy = {_, _}) ->
-  gen_fsm:send_event(PPid, {move, Dxy}).
+move_player(PPid, XY = {_, _}) ->
+  io:format("catch move event~n"),
+  gen_fsm:send_event(PPid, {move, XY}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -65,6 +66,7 @@ init([WSServPid, Name]) ->
 %% 動作可能状態
 %% moveイベントが来たらmove状態へ移動
 move({move, {X, Y}}, S = #pstate{}) ->
+  io:format("new posX: ~p posY: ~p~n", [X, Y]),
   {next_state, move, S#pstate{pos = {X, Y}}}.
 
 state_name(_Event, _From, State) ->

@@ -125,6 +125,12 @@ handle_info(Msg, S) ->
   io:format("unexpected msg: ~p~n", [Msg]),
   {noreply, S}.
 
+handle_cast({event, Args}, S = #wsservstate{ppid = PPid}) ->
+  io:format("move request~n"),
+  mmmario:move_player(PPid, {0, 0}),
+  {noreply, S};
+
+
 %% TCPアクセプトを処理する関数
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
 handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
@@ -135,7 +141,7 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   case do_handshake(CSock, maps:new()) of
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
-      {ok, PPid} = mmmario:join_player(self(), "test"), % キャラクターのFSMを起動しておく
+      {ok, PPid} = mmmario:join_player(self(), make_ref()), % キャラクターのFSMを起動しておく
       {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
     {stop, Reason, _} -> {stop, Reason, S};
     _ -> {stop, "failed handshake with unknown reason", S}
@@ -151,6 +157,7 @@ handle_cast(
   io:format("text data received: ~p~n", [Data]),
   SendWSDataFrame = encode_ws_dataframe(Data, #{}),
   io:format("send dataframe: ~p~n", [SendWSDataFrame]),
+  gen_server:cast(self(), {event, mmmario_event:text_to_event(binary:bin_to_list(Data))}), % イベントに変換後、wsserv内で処理する
   gen_tcp:send(CSock, SendWSDataFrame),
   inet:setopts(CSock, [{active, once}]),
   {noreply, S};
