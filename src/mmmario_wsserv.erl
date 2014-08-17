@@ -125,9 +125,13 @@ handle_info(Msg, S) ->
   io:format("unexpected msg: ~p~n", [Msg]),
   {noreply, S}.
 
-handle_cast({event, Args}, S = #wsservstate{ppid = PPid}) ->
+handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
   io:format("move request~n"),
-  mmmario:move_player(PPid, {0, 0}),
+  mmmario:move_player(PPid, Args),
+  {noreply, S};
+
+handle_cast({event, _Unkonwn}, S = #wsservstate{}) ->
+  io:format("unknown event request: ~p~n", [_Unkonwn]),
   {noreply, S};
 
 
@@ -157,7 +161,7 @@ handle_cast(
   io:format("text data received: ~p~n", [Data]),
   SendWSDataFrame = encode_ws_dataframe(Data, #{}),
   io:format("send dataframe: ~p~n", [SendWSDataFrame]),
-  gen_server:cast(self(), {event, mmmario_event:text_to_event(binary:bin_to_list(Data))}), % イベントに変換後、wsserv内で処理する
+  gen_server:cast(self(), {event, mmmario_event_helper:text_to_event(binary:bin_to_list(Data))}), % イベントに変換後、wsserv内で処理する
   gen_tcp:send(CSock, SendWSDataFrame),
   inet:setopts(CSock, [{active, once}]),
   {noreply, S};

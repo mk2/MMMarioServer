@@ -16,7 +16,7 @@
 %%%%%%%%%%%% RELEASE %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
--export([start_link/2, move_player/2]).
+-export([start_link/2, move_player/2, move/2]).
 %% gen_fsm callbacks
 -export([init/1,
   handle_event/3,
@@ -51,6 +51,7 @@ start_link(WSServPid, Name) ->
 
 %% プレイヤーを動かす
 move_player(PPid, XY = {_, _}) ->
+  io:format("Player Pid: ~p~n", [PPid]),
   io:format("catch move event~n"),
   gen_fsm:send_event(PPid, {move, XY}).
 
