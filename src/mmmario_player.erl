@@ -81,7 +81,8 @@ handle_sync_event(_Event, _From, StateName, State) ->
 handle_info(_Info, StateName, State) ->
   {next_state, StateName, State}.
 
-terminate(_Reason, _StateName, _State) ->
+terminate(Reason, _StateName, _State) ->
+  io:format("terminating with: ~p~n", [Reason]),
   ok.
 
 code_change(_OldVsn, StateName, State, _Extra) ->
