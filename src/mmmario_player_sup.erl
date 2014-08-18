@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_player/2, children/0]).
+-export([start_link/0, start_player/2, children/0, childPids/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -31,6 +31,9 @@ start_player(WSServPid, Name) ->
 
 children() ->
   supervisor:which_children(?SERVER).
+
+childPids() ->
+  [Pid || {_, Pid, _, _} <- supervisor:which_children(?SERVER)].
 
 %%%===================================================================
 %%% Supervisor callbacks

@@ -194,14 +194,14 @@ handle_cast(
     S = #wsservstate{csock = CSock}
 ) ->
   io:format("data will be sent: ~p~n", [Data]),
-  WSDataFrame = encode_ws_dataframe(Data, {}),
+  WSDataFrame = encode_ws_dataframe(Data, #{}),
   gen_tcp:send(CSock, WSDataFrame),
-  {ok, S#wsservstate{wsdataframe = WSDataFrame}}.
+  {noreply, S#wsservstate{wsdataframe = WSDataFrame}}.
 
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
 terminate(Reason, S = #wsservstate{csock = CSock, ppid = PPid}) ->
-  io:format("terminating: ~p~n", [Reason]),
+  io:format("terminating wsserv: ~p~n", [Reason]),
   gen_tcp:close(CSock),
   exit(PPid, normal),
   {stop, Reason, S}.

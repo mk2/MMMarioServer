@@ -72,9 +72,9 @@ init([WSServPid, Name]) ->
 
 %% 動作可能状態
 %% moveイベントが来たらmove状態へ移動
-move({move, {X, Y}}, S = #pstate{name = Name}) ->
+move({move, {X, Y}}, S = #pstate{}) ->
   io:format("new posX: ~p posY: ~p~n", [X, Y]),
-  gen_event:notify(mmmario_event_handler, {update_chara_pos, Name}),
+  mmmario_event_handler:notify({update_chara_pos, self()}),
   {next_state, move, S#pstate{pos = {X, Y}}}.
 
 state_name(_Event, _From, S) ->
@@ -85,7 +85,7 @@ handle_event(_Event, SName, S) ->
   {next_state, SName, S}.
 
 handle_sync_event(get_pos, _From, SName, S = #pstate{pos = Pos, name = Name}) ->
-  {reply, {Name, Pos}, SName, S};
+  {reply, Pos, SName, S};
 
 handle_sync_event(_Event, _From, SName, S) ->
   Reply = ok,

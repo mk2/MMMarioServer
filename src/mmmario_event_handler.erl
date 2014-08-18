@@ -15,7 +15,8 @@
 -export([
   start_link/0,
   add_handler/0,
-  remove_handler/1
+  remove_handler/1,
+  notify/1
 ]).
 
 %% gen_event callbacks
@@ -31,7 +32,7 @@
 -record(evtstate, {}).
 
 %%%===================================================================
-%%% gen_event callbacks
+%%% 公開APIs
 %%%===================================================================
 
 start_link() ->
@@ -46,6 +47,9 @@ remove_handler(HandlerId) ->
   gen_event:delete_handler(?SERVER, HandlerId, []),
   ok.
 
+notify(Event) ->
+  gen_event:notify(?SERVER, Event).
+
 %%%===================================================================
 %%% gen_event callbacks
 %%%===================================================================
@@ -53,10 +57,16 @@ remove_handler(HandlerId) ->
 init([]) ->
   {ok, #evtstate{}}.
 
-handle_event({update_chara_pos, Name}, S) ->
-  Children = mmmario_player_sup:children(),
-  CPoss = [mmmario_player:get_pos(PPid) || {_, PPid, _, _} <- Children],
-  io:format("CPoss: ~p~n", [CPoss]),
+%% キャラの位置更新イベントを受け取る
+%% 受け取ったら全キャラの位置情報を取得し、一斉にクライアントに投げる。微妙？
+handle_event({update_chara_pos, SenderPPid}, S) ->
+  CharaPos = [mmmario_player:get_pos(PPid) || PPid <- mmmario_player_sup:childPids(), PPid =/= SenderPPid],
+  case mmmario_event_helper:pos_list_to_binary(CharaPos) of
+    {ok, Str} ->
+      [mmmario_wsserv:send(WSServPid, Str) || WSServPid <- mmmario_wsserv_sup:childPids()];
+    _ -> ok
+  end,
+  io:format("character positions (except event fire process): ~p~n", [CharaPos]),
   {ok, S};
 handle_event(_Event, S) ->
   {ok, S}.

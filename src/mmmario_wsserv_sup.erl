@@ -11,11 +11,30 @@
 -author("lycaon").
 
 %% API
--export([start_link/0, start_wsserv/0]).
+-export([start_link/0, start_wsserv/0, children/0, childPids/0]).
 -export([init/1]).
+
+-define(SERVER, ?MODULE).
+
+%%%============================================================================
+%%% 公開APIs
+%%%============================================================================
 
 start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+children() ->
+  supervisor:which_children(?SERVER).
+
+childPids() ->
+  [Pid || {_, Pid, _, _} <- supervisor:which_children(?SERVER)].
+
+start_wsserv() ->
+  supervisor:start_child(?MODULE, []).
+
+%%%============================================================================
+%%% supervisor callbacks
+%%%============================================================================
 
 init([]) ->
   MaxR = 60,
@@ -31,8 +50,9 @@ init([]) ->
       temporary, 1000, worker, [mmmario_wsserv]
     }]}}.
 
-start_wsserv() ->
-  supervisor:start_child(?MODULE, []).
+%%%============================================================================
+%%% 内部関数
+%%%============================================================================
 
 empty_wsservs() ->
   [start_wsserv() || _ <- lists:seq(1, 20)],
