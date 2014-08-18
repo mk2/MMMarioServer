@@ -3,6 +3,7 @@ import Window
 import Keyboard
 import Graphics.Collage (..)
 import Graphics.Element (image, fittedImage, croppedImage)
+import WebSocket
 import Debug (log)
 
 -- 自作ライブラリのimport
@@ -14,7 +15,10 @@ import Vector (..)
  --}
 
 -- ゲームのFPS
-gameFps = 60
+gameFps = 0.5
+
+-- サーバーへのリクエストFPS
+requestFps = 1
 
 -- ゲームの初期状態
 initialGameState = {
@@ -33,6 +37,8 @@ initialGameState = {
                    , stageTileHeight = 100
                    , screenTileWidth = 10
                    , screenTileHeight = 10
+                   , sendText = ""
+                   , receiveText = ""
                    }
 
 -- マリオのジャンプ加速度
@@ -52,6 +58,10 @@ tileWidth = 32
 
 -- タイルの高さ(px)
 tileHeight = 32
+
+-- サーバーのURL
+-- serverUrl = "ws://localhost:8081"
+serverUrl = "ws://echo.websocket.org"
 
 {--------------------------------------------------------------------}
 {--
@@ -77,6 +87,8 @@ type GameState = {
                  , stageTileHeight : Float
                  , screenTileWidth : Float
                  , screenTileHeight : Float
+                 , sendText : String
+                 , receiveText : String
                  }
 
 type UserInput = {
@@ -115,10 +127,10 @@ calcCharaAccel delta moveAccel fricAccel gravityAccel jump m =
 
 -- キャラクターの位置を計算
 calcCharaPos delta m =
-  let x = fst m.pos
-      y = snd m.pos
-      ax = fst m.acc
-      ay = snd m.acc
+  let x = getx m.pos
+      y = gety m.pos
+      ax = getx m.acc
+      ay = gety m.acc
       sx = ax * delta
       sy = ay * delta
   in if | m.isTouchOnBlock -> { m | acc <- zeroVec, spd <- zeroVec
@@ -159,7 +171,10 @@ stepGame (delta, arr, space) gameState =
       -- マリオを更新する
       newMario = log "new mario" <| updateChara <| preMario
 
-  in { gameState | mario <- newMario }
+
+  in { gameState | mario <- newMario
+                 , sendText <- show delta
+     }
 
 -- 入力シグナル
 -- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー) を取得
@@ -172,16 +187,16 @@ inputSignal =
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Form
-display (windowWidth, windowHeight) gameState  =
+display (windowWidth, windowHeight) gameState =
   let
 
       -- スクリーンタイルサイズ
       screenTileWidth = (/) tileWidth <| toFloat windowWidth
       screenTileHeight = (/) tileHeight <| toFloat windowHeight
 
-
       lastGameState = { gameState | screenTileWidth <- screenTileWidth
-                                  , screenTileHeight <- screenTileHeight }
+                                  , screenTileHeight <- screenTileHeight
+                                  }
 
       marioImage = getImage lastGameState.mario (20, 35)
       marioPos = log "mario pos" lastGameState.mario.pos
@@ -190,5 +205,6 @@ display (windowWidth, windowHeight) gameState  =
     [move marioPos <| toForm marioImage]
 
 -- エントリーポイント
-main = display <~ Window.dimensions
-                ~ foldp stepGame initialGameState inputSignal
+main = let gameStateSignal = foldp stepGame initialGameState inputSignal
+       in display <~ Window.dimensions
+                   ~ gameStateSignal

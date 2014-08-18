@@ -32,3 +32,10 @@ revVec (x, y) =
 -- 単位ベクトル
 unitVec : Vec
 unitVec = (1, 1)
+
+
+-- x要素
+getx = fst
+
+-- y要素
+gety = snd
