@@ -3,7 +3,37 @@
 
 <head>
     <title>Massive Multiplay Mario Client By Elm</title>
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+
     <style type="text/css">
+        html, body {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        div#container {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            clear: both;
+        }
+
+        div#title {
+            margin: 0 auto;
+            text-align: center;
+        }
+
         div#mmmario_container {
             width: 640px;
             height: 100%;
@@ -11,6 +41,7 @@
         }
 
         div#mmmario {
+            border: 1px solid;
             width: 100%;
             height: 640px;
             margin: 0 auto;
@@ -19,17 +50,33 @@
 </head>
 
 <body>
-
-<div id="mmmario_container">
-    <div id="mmmario"></div>
+<div id="container">
+    <div id="title">
+        <img src="resources/images/title.png" alt="title"/>
+    </div>
+    <div id="mmmario_container">
+        <div id="mmmario"></div>
+    </div>
 </div>
 
 <!-- JS読み込み -->
 <script type="text/javascript" src="//elm-lang.org/elm-runtime.js"></script>
 <script type="text/javascript" src="build/MMMarioClient.js"></script>
 <script type="text/javascript">
+
+    // URL
+    var url = 'ws://echo.websocket.org';
+    // var url = 'ws://localhost';
+
+    // WebSocketへの接続
+    var ws = new WebSocket(url);
+
+    // MMMarioの起動
     var mmmarioDiv = document.getElementById('mmmario');
-    var mmmarioClient = Elm.embed(Elm.MMMarioClient, mmmarioDiv);
+    var mmmarioClient = Elm.embed(Elm.MMMarioClient, mmmarioDiv, { wsRecvData: "" });
+
+    mmmarioClient.ports.wsRecvData.send("test");
+
 </script>
 
 </body>

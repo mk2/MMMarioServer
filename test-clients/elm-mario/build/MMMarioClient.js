@@ -34,6 +34,10 @@ Elm.MMMarioClient.make = function (_elm) {
    var WebSocket = Elm.WebSocket.make(_elm);
    var Window = Elm.Window.make(_elm);
    var _op = {};
+   var wsRecvData = Native.Ports.portIn("wsRecvData",
+   Native.Ports.incomingSignal(function (v) {
+      return typeof v === "string" || typeof v === "object" && v instanceof String ? v : _E.raise("invalid input, expecting JSString but got " + v);
+   }));
    var updateCharaImage = function (m) {
       return m;
    };
@@ -165,8 +169,9 @@ Elm.MMMarioClient.make = function (_elm) {
    gameState) {
       return function () {
          switch (_v0.ctor)
-         {case "_Tuple3":
+         {case "_Tuple4":
             return function () {
+                 var rd = Debug.log("WebSocket Recv Data")(_v0._3);
                  var moveAccel = A2(Vector.multVec,
                  {ctor: "_Tuple2"
                  ,_0: Basics.toFloat(_v0._1.x)
@@ -192,7 +197,7 @@ Elm.MMMarioClient.make = function (_elm) {
                  gameState);
               }();}
          _E.Case($moduleName,
-         "between lines 166 and 185");
+         "between lines 166 and 187");
       }();
    });
    var initialGameState = {_: {}
@@ -222,13 +227,13 @@ Elm.MMMarioClient.make = function (_elm) {
    var imageBaseUrl = _L.append(resourceBaseUrl,
    "images/");
    var getImage = F2(function (chara,
-   _v5) {
+   _v6) {
       return function () {
-         switch (_v5.ctor)
+         switch (_v6.ctor)
          {case "_Tuple2":
             return A3(Graphics.Element.image,
-              _v5._0,
-              _v5._1,
+              _v6._0,
+              _v6._1,
               List.concat(_L.fromArray([imageBaseUrl
                                        ,chara.imageBaseName
                                        ,"-"
@@ -240,20 +245,20 @@ Elm.MMMarioClient.make = function (_elm) {
          "on line 160, column 3 to 116");
       }();
    });
-   var display = F2(function (_v9,
+   var display = F2(function (_v10,
    gameState) {
       return function () {
-         switch (_v9.ctor)
+         switch (_v10.ctor)
          {case "_Tuple2":
             return function () {
                  var screenTileHeight = F2(function (x,
                  y) {
                     return x / y;
-                 })(tileHeight)(Basics.toFloat(_v9._1));
+                 })(tileHeight)(Basics.toFloat(_v10._1));
                  var screenTileWidth = F2(function (x,
                  y) {
                     return x / y;
-                 })(tileWidth)(Basics.toFloat(_v9._0));
+                 })(tileWidth)(Basics.toFloat(_v10._0));
                  var lastGameState = _U.replace([["screenTileWidth"
                                                  ,screenTileWidth]
                                                 ,["screenTileHeight"
@@ -268,12 +273,12 @@ Elm.MMMarioClient.make = function (_elm) {
                  "mario pos",
                  lastGameState.mario.pos);
                  return A3(Graphics.Collage.collage,
-                 _v9._0,
-                 _v9._1,
+                 _v10._0,
+                 _v10._1,
                  _L.fromArray([Graphics.Collage.move(marioPos)(Graphics.Collage.toForm(marioImage))]));
               }();}
          _E.Case($moduleName,
-         "between lines 199 and 213");
+         "between lines 209 and 223");
       }();
    });
    var requestFps = 1;
@@ -284,31 +289,32 @@ Elm.MMMarioClient.make = function (_elm) {
       Time.fps(gameFps));
       var keySignal = A2(Signal._op["~"],
       A2(Signal._op["~"],
+      A2(Signal._op["~"],
       A2(Signal._op["<~"],
-      F3(function (v0,v1,v2) {
-         return {ctor: "_Tuple3"
+      F4(function (v0,v1,v2,v3) {
+         return {ctor: "_Tuple4"
                 ,_0: v0
                 ,_1: v1
-                ,_2: v2};
+                ,_2: v2
+                ,_3: v3};
       }),
       delta),
       Keyboard.arrows),
-      Keyboard.space);
+      Keyboard.space),
+      wsRecvData);
       return A2(Signal.sampleOn,
       delta,
       keySignal);
    }();
-   var main = function () {
-      var gameStateSignal = A3(Signal.foldp,
-      stepGame,
-      initialGameState,
-      inputSignal);
-      return A2(Signal._op["~"],
-      A2(Signal._op["<~"],
-      display,
-      Window.dimensions),
-      gameStateSignal);
-   }();
+   var gameStateSignal = A3(Signal.foldp,
+   stepGame,
+   initialGameState,
+   inputSignal);
+   var main = A2(Signal._op["~"],
+   A2(Signal._op["<~"],
+   display,
+   Window.dimensions),
+   gameStateSignal);
    _elm.MMMarioClient.values = {_op: _op
                                ,gameFps: gameFps
                                ,requestFps: requestFps
@@ -328,6 +334,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                ,getImage: getImage
                                ,stepGame: stepGame
                                ,inputSignal: inputSignal
+                               ,gameStateSignal: gameStateSignal
                                ,display: display
                                ,main: main
                                ,RChara: RChara

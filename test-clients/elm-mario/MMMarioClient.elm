@@ -161,8 +161,8 @@ getImage chara (w, h) =
 
 -- ゲーム関数
 -- (更新秒, (矢印キー上下, 矢印キー左右), キーボード) -> ゲームステート -> ゲームステート
-stepGame : (Float, {x : Int, y : Int}, Bool) -> GameState -> GameState
-stepGame (delta, arr, space) gameState =
+stepGame : (Float, {x : Int, y : Int}, Bool, String) -> GameState -> GameState
+stepGame (delta, arr, space, recvData) gameState =
   let
       -- 更新前のマリオ
       preMario = gameState.mario
@@ -180,18 +180,28 @@ stepGame (delta, arr, space) gameState =
       newMario = log "new mario" <| updateChara <| preMario
 
 
+      rd = log "WebSocket Recv Data" <| recvData
+
   in { gameState | mario <- newMario
                  , sendText <- show delta
      }
 
+-- WebSocketからの受信データ
+port wsRecvData : Signal String
+
 -- 入力シグナル
--- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー) を取得
+-- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー, WSからの受信データ) を取得
 inputSignal =
   let delta = inSeconds <~ fps gameFps
-      keySignal = (,,) <~ delta
+      keySignal = (,,,) <~ delta
                         ~ Keyboard.arrows
                         ~ Keyboard.space
+                        ~ wsRecvData
   in sampleOn delta keySignal
+
+-- ゲーム状態のシグナル
+gameStateSignal : Signal GameState
+gameStateSignal = foldp stepGame initialGameState inputSignal
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Form
@@ -213,6 +223,5 @@ display (windowWidth, windowHeight) gameState =
     [move marioPos <| toForm marioImage]
 
 -- エントリーポイント
-main = let gameStateSignal = foldp stepGame initialGameState inputSignal
-       in display <~ Window.dimensions
-                   ~ gameStateSignal
+main = display <~ Window.dimensions
+                ~ gameStateSignal
