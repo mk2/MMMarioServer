@@ -34,6 +34,9 @@ Elm.MMMarioClient.make = function (_elm) {
    var WebSocket = Elm.WebSocket.make(_elm);
    var Window = Elm.Window.make(_elm);
    var _op = {};
+   var sendData = function (gameState) {
+      return gameState.sendData;
+   };
    var wsRecvData = Native.Ports.portIn("wsRecvData",
    Native.Ports.incomingSignal(function (v) {
       return typeof v === "string" || typeof v === "object" && v instanceof String ? v : _E.raise("invalid input, expecting JSString but got " + v);
@@ -78,19 +81,17 @@ Elm.MMMarioClient.make = function (_elm) {
              ,arr: a
              ,space: b};
    });
-   var GameState = F7(function (a,
+   var GameState = F6(function (a,
    b,
    c,
    d,
    e,
-   f,
-   g) {
+   f) {
       return {_: {}
              ,mario: a
-             ,receiveText: g
              ,screenTileHeight: e
              ,screenTileWidth: d
-             ,sendText: f
+             ,sendData: f
              ,stageTileHeight: c
              ,stageTileWidth: b};
    });
@@ -192,12 +193,12 @@ Elm.MMMarioClient.make = function (_elm) {
                  var newMario = Debug.log("new mario")(updateChara(preMario));
                  return _U.replace([["mario"
                                     ,newMario]
-                                   ,["sendText"
+                                   ,["sendData"
                                     ,String.show(_v0._0)]],
                  gameState);
               }();}
          _E.Case($moduleName,
-         "between lines 166 and 187");
+         "between lines 164 and 185");
       }();
    });
    var initialGameState = {_: {}
@@ -217,10 +218,9 @@ Elm.MMMarioClient.make = function (_elm) {
                                   ,spd: {ctor: "_Tuple2"
                                         ,_0: 0
                                         ,_1: 0}}
-                          ,receiveText: ""
                           ,screenTileHeight: 10
                           ,screenTileWidth: 10
-                          ,sendText: ""
+                          ,sendData: ""
                           ,stageTileHeight: 100
                           ,stageTileWidth: 200};
    var resourceBaseUrl = "resources/";
@@ -242,7 +242,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                        ,chara.imageDireName
                                        ,".png"])));}
          _E.Case($moduleName,
-         "on line 160, column 3 to 116");
+         "on line 158, column 3 to 116");
       }();
    });
    var display = F2(function (_v10,
@@ -278,7 +278,7 @@ Elm.MMMarioClient.make = function (_elm) {
                  _L.fromArray([Graphics.Collage.move(marioPos)(Graphics.Collage.toForm(marioImage))]));
               }();}
          _E.Case($moduleName,
-         "between lines 209 and 223");
+         "between lines 212 and 226");
       }();
    });
    var requestFps = 1;
@@ -310,6 +310,13 @@ Elm.MMMarioClient.make = function (_elm) {
    stepGame,
    initialGameState,
    inputSignal);
+   var wsSendData = Native.Ports.portOut("wsSendData",
+   Native.Ports.outgoingSignal(function (v) {
+      return v;
+   }),
+   A2(Signal._op["<~"],
+   sendData,
+   gameStateSignal));
    var main = A2(Signal._op["~"],
    A2(Signal._op["<~"],
    display,
@@ -335,6 +342,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                ,stepGame: stepGame
                                ,inputSignal: inputSignal
                                ,gameStateSignal: gameStateSignal
+                               ,sendData: sendData
                                ,display: display
                                ,main: main
                                ,RChara: RChara

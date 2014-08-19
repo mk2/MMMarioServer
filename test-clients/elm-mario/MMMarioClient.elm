@@ -45,8 +45,7 @@ initialGameState = {
                    , stageTileHeight = 100
                    , screenTileWidth = 10
                    , screenTileHeight = 10
-                   , sendText = ""
-                   , receiveText = ""
+                   , sendData = ""
                    }
 
 -- マリオのジャンプ加速度
@@ -95,8 +94,7 @@ type GameState = {
                  , stageTileHeight : Float
                  , screenTileWidth : Float
                  , screenTileHeight : Float
-                 , sendText : String
-                 , receiveText : String
+                 , sendData : String
                  }
 
 type UserInput = {
@@ -183,7 +181,7 @@ stepGame (delta, arr, space, recvData) gameState =
       rd = log "WebSocket Recv Data" <| recvData
 
   in { gameState | mario <- newMario
-                 , sendText <- show delta
+                 , sendData <- show delta
      }
 
 -- WebSocketからの受信データ
@@ -202,6 +200,11 @@ inputSignal =
 -- ゲーム状態のシグナル
 gameStateSignal : Signal GameState
 gameStateSignal = foldp stepGame initialGameState inputSignal
+
+sendData gameState = gameState.sendData
+
+port wsSendData : Signal String
+port wsSendData = sendData <~ gameStateSignal
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Form

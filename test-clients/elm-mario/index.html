@@ -75,7 +75,17 @@
     var mmmarioDiv = document.getElementById('mmmario');
     var mmmarioClient = Elm.embed(Elm.MMMarioClient, mmmarioDiv, { wsRecvData: "" });
 
-    mmmarioClient.ports.wsRecvData.send("test");
+    ws.onmessage = function (e) {
+        mmmarioClient.ports.wsRecvData.send(e.data);
+    };
+
+    ws.onopen = function(e) {
+        console.log('WebSocket connect is open.');
+
+        mmmarioClient.ports.wsSendData.subscribe(function(data) {
+            ws.send(data);
+        });
+    };
 
 </script>
 
