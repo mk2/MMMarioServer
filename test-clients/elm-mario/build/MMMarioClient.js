@@ -34,24 +34,6 @@ Elm.MMMarioClient.make = function (_elm) {
    var WebSocket = Elm.WebSocket.make(_elm);
    var Window = Elm.Window.make(_elm);
    var _op = {};
-   var getImage = F2(function (chara,
-   _v0) {
-      return function () {
-         switch (_v0.ctor)
-         {case "_Tuple2":
-            return A3(Graphics.Element.image,
-              _v0._0,
-              _v0._1,
-              List.concat(_L.fromArray([chara.imageBaseName
-                                       ,"-"
-                                       ,chara.imagePoseName
-                                       ,"-"
-                                       ,chara.imageDireName
-                                       ,".png"])));}
-         _E.Case($moduleName,
-         "on line 154, column 3 to 102");
-      }();
-   });
    var updateCharaImage = function (m) {
       return m;
    };
@@ -134,42 +116,6 @@ Elm.MMMarioClient.make = function (_elm) {
    var serverUrl = "ws://echo.websocket.org";
    var tileHeight = 32;
    var tileWidth = 32;
-   var display = F2(function (_v4,
-   gameState) {
-      return function () {
-         switch (_v4.ctor)
-         {case "_Tuple2":
-            return function () {
-                 var screenTileHeight = F2(function (x,
-                 y) {
-                    return x / y;
-                 })(tileHeight)(Basics.toFloat(_v4._1));
-                 var screenTileWidth = F2(function (x,
-                 y) {
-                    return x / y;
-                 })(tileWidth)(Basics.toFloat(_v4._0));
-                 var lastGameState = _U.replace([["screenTileWidth"
-                                                 ,screenTileWidth]
-                                                ,["screenTileHeight"
-                                                 ,screenTileHeight]],
-                 gameState);
-                 var marioImage = A2(getImage,
-                 lastGameState.mario,
-                 {ctor: "_Tuple2"
-                 ,_0: 20
-                 ,_1: 35});
-                 var marioPos = A2(Debug.log,
-                 "mario pos",
-                 lastGameState.mario.pos);
-                 return A3(Graphics.Collage.collage,
-                 _v4._0,
-                 _v4._1,
-                 _L.fromArray([Graphics.Collage.move(marioPos)(Graphics.Collage.toForm(marioImage))]));
-              }();}
-         _E.Case($moduleName,
-         "between lines 193 and 207");
-      }();
-   });
    var moveCoeff = 200000;
    var fricCoeff = 500;
    var gravityAccel = {ctor: "_Tuple2"
@@ -215,38 +161,38 @@ Elm.MMMarioClient.make = function (_elm) {
          m);
       }();
    });
-   var stepGame = F2(function (_v8,
+   var stepGame = F2(function (_v0,
    gameState) {
       return function () {
-         switch (_v8.ctor)
+         switch (_v0.ctor)
          {case "_Tuple3":
             return function () {
                  var moveAccel = A2(Vector.multVec,
                  {ctor: "_Tuple2"
-                 ,_0: Basics.toFloat(_v8._1.x)
-                 ,_1: Basics.toFloat(_v8._1.y)},
+                 ,_0: Basics.toFloat(_v0._1.x)
+                 ,_1: Basics.toFloat(_v0._1.y)},
                  moveCoeff);
                  var preMario = gameState.mario;
                  var fricAccel = A2(Vector.multVec,
                  Vector.revVec(preMario.spd),
                  fricCoeff);
                  var updateChara = function ($) {
-                    return updateCharaImage(calcCharaPos(_v8._0)(A5(calcCharaAccel,
-                    _v8._0,
+                    return updateCharaImage(calcCharaPos(_v0._0)(A5(calcCharaAccel,
+                    _v0._0,
                     moveAccel,
                     fricAccel,
                     gravityAccel,
-                    _v8._2)($)));
+                    _v0._2)($)));
                  };
                  var newMario = Debug.log("new mario")(updateChara(preMario));
                  return _U.replace([["mario"
                                     ,newMario]
                                    ,["sendText"
-                                    ,String.show(_v8._0)]],
+                                    ,String.show(_v0._0)]],
                  gameState);
               }();}
          _E.Case($moduleName,
-         "between lines 160 and 179");
+         "between lines 166 and 185");
       }();
    });
    var initialGameState = {_: {}
@@ -272,8 +218,66 @@ Elm.MMMarioClient.make = function (_elm) {
                           ,sendText: ""
                           ,stageTileHeight: 100
                           ,stageTileWidth: 200};
+   var resourceBaseUrl = "resources/";
+   var imageBaseUrl = _L.append(resourceBaseUrl,
+   "images/");
+   var getImage = F2(function (chara,
+   _v5) {
+      return function () {
+         switch (_v5.ctor)
+         {case "_Tuple2":
+            return A3(Graphics.Element.image,
+              _v5._0,
+              _v5._1,
+              List.concat(_L.fromArray([imageBaseUrl
+                                       ,chara.imageBaseName
+                                       ,"-"
+                                       ,chara.imagePoseName
+                                       ,"-"
+                                       ,chara.imageDireName
+                                       ,".png"])));}
+         _E.Case($moduleName,
+         "on line 160, column 3 to 116");
+      }();
+   });
+   var display = F2(function (_v9,
+   gameState) {
+      return function () {
+         switch (_v9.ctor)
+         {case "_Tuple2":
+            return function () {
+                 var screenTileHeight = F2(function (x,
+                 y) {
+                    return x / y;
+                 })(tileHeight)(Basics.toFloat(_v9._1));
+                 var screenTileWidth = F2(function (x,
+                 y) {
+                    return x / y;
+                 })(tileWidth)(Basics.toFloat(_v9._0));
+                 var lastGameState = _U.replace([["screenTileWidth"
+                                                 ,screenTileWidth]
+                                                ,["screenTileHeight"
+                                                 ,screenTileHeight]],
+                 gameState);
+                 var marioImage = A2(getImage,
+                 lastGameState.mario,
+                 {ctor: "_Tuple2"
+                 ,_0: 20
+                 ,_1: 35});
+                 var marioPos = A2(Debug.log,
+                 "mario pos",
+                 lastGameState.mario.pos);
+                 return A3(Graphics.Collage.collage,
+                 _v9._0,
+                 _v9._1,
+                 _L.fromArray([Graphics.Collage.move(marioPos)(Graphics.Collage.toForm(marioImage))]));
+              }();}
+         _E.Case($moduleName,
+         "between lines 199 and 213");
+      }();
+   });
    var requestFps = 1;
-   var gameFps = 0.5;
+   var gameFps = 60;
    var inputSignal = function () {
       var delta = A2(Signal._op["<~"],
       Time.inSeconds,
@@ -308,6 +312,8 @@ Elm.MMMarioClient.make = function (_elm) {
    _elm.MMMarioClient.values = {_op: _op
                                ,gameFps: gameFps
                                ,requestFps: requestFps
+                               ,resourceBaseUrl: resourceBaseUrl
+                               ,imageBaseUrl: imageBaseUrl
                                ,initialGameState: initialGameState
                                ,marioJumpAccel: marioJumpAccel
                                ,gravityAccel: gravityAccel

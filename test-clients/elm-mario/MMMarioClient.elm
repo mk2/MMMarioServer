@@ -17,10 +17,16 @@ import Vector (..)
  --}
 
 -- ゲームのFPS
-gameFps = 0.5
+gameFps = 60
 
 -- サーバーへのリクエストFPS
 requestFps = 1
+
+-- リソースへのアクセスパス
+resourceBaseUrl = "resources/"
+
+-- 画像へのアクセスパス
+imageBaseUrl = resourceBaseUrl ++ "images/"
 
 -- ゲームの初期状態
 initialGameState = {
@@ -151,7 +157,7 @@ updateCharaImage m =
 
 -- キャラクターイメージの取得
 getImage chara (w, h) =
-  image w h (concat [chara.imageBaseName, "-", chara.imagePoseName, "-", chara.imageDireName, ".png"])
+  image w h (concat [imageBaseUrl, chara.imageBaseName, "-", chara.imagePoseName, "-", chara.imageDireName, ".png"])
 
 -- ゲーム関数
 -- (更新秒, (矢印キー上下, 矢印キー左右), キーボード) -> ゲームステート -> ゲームステート

@@ -2,9 +2,36 @@
 <html>
 
 <head>
-<title>Embedding Elm</title>
+    <title>Massive Multiplay Mario Client By Elm</title>
+    <style type="text/css">
+        div#mmmario_container {
+            width: 640px;
+            height: 100%;
+            margin: 0 auto;
+        }
+
+        div#mmmario {
+            width: 100%;
+            height: 640px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="mmmario_container">
+    <div id="mmmario"></div>
+</div>
+
+<!-- JS読み込み -->
 <script type="text/javascript" src="//elm-lang.org/elm-runtime.js"></script>
 <script type="text/javascript" src="build/MMMarioClient.js"></script>
-</head>
+<script type="text/javascript">
+    var mmmarioDiv = document.getElementById('mmmario');
+    var mmmarioClient = Elm.embed(Elm.MMMarioClient, mmmarioDiv);
+</script>
+
+</body>
 
 </html>
