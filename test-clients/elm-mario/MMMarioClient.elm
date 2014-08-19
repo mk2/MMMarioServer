@@ -17,7 +17,7 @@ import Vector (..)
  --}
 
 -- ゲームのFPS
-gameFps = 1
+gameFps = 5
 
 -- サーバーへのリクエストFPS
 requestFps = 1

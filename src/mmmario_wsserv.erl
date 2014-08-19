@@ -146,6 +146,7 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
       {ok, PPid} = mmmario:new_player(self(), make_ref()), % キャラクターのFSMを起動しておく
+      link(PPid),
       {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
     {stop, Reason, _} -> {stop, Reason, S};
     _ -> {stop, "failed handshake with unknown reason", S}
@@ -201,10 +202,10 @@ handle_cast(
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
 terminate(Reason, S = #wsservstate{csock = CSock, ppid = PPid}) ->
-  io:format("terminating wsserv: ~p~n", [Reason]),
-  gen_tcp:close(CSock),
+  io:format("terminating wsserv with: ~p~n", [Reason]),
   exit(PPid, normal),
-  {stop, Reason, S}.
+  gen_tcp:close(CSock),
+  ok.
 
 %% gen_serverコールバック
 %%

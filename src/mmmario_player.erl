@@ -95,7 +95,7 @@ handle_info(_Info, SName, S) ->
   {next_state, SName, S}.
 
 terminate(Reason, _SName, S = #pstate{ehdlr = HandlerId}) ->
-  io:format("terminating with: ~p~n", [Reason]),
+  io:format("terminating player with: ~p~n", [Reason]),
   mmmario_event_handler:remove_handler(HandlerId),
   ok.
 

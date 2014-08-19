@@ -282,7 +282,7 @@ Elm.MMMarioClient.make = function (_elm) {
       }();
    });
    var requestFps = 1;
-   var gameFps = 1;
+   var gameFps = 5;
    var inputSignal = function () {
       var delta = A2(Signal._op["<~"],
       Time.inSeconds,
