@@ -17,7 +17,7 @@ import Vector (..)
  --}
 
 -- ゲームのFPS
-gameFps = 60
+gameFps = 1
 
 -- サーバーへのリクエストFPS
 requestFps = 1
@@ -175,13 +175,13 @@ stepGame (delta, arr, space, recvData) gameState =
       updateChara = updateCharaImage . calcCharaPos delta . calcCharaAccel delta moveAccel fricAccel gravityAccel space
 
       -- マリオを更新する
-      newMario = log "new mario" <| updateChara <| preMario
+      newMario = updateChara <| preMario
 
-
-      rd = log "WebSocket Recv Data" <| recvData
+      -- 送信するマリオのいち情報
+      marioPosStr = "M" ++ (show . getx <| newMario.pos) ++ "," ++ (show . gety <| newMario.pos)
 
   in { gameState | mario <- newMario
-                 , sendData <- show delta
+                 , sendData <- marioPosStr
      }
 
 -- WebSocketからの受信データ
@@ -204,7 +204,7 @@ gameStateSignal = foldp stepGame initialGameState inputSignal
 sendData gameState = gameState.sendData
 
 port wsSendData : Signal String
-port wsSendData = sendData <~ gameStateSignal
+port wsSendData = dropRepeats <| sendData <~ gameStateSignal
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Form
@@ -220,7 +220,7 @@ display (windowWidth, windowHeight) gameState =
                                   }
 
       marioImage = getImage lastGameState.mario (20, 35)
-      marioPos = log "mario pos" lastGameState.mario.pos
+      marioPos = lastGameState.mario.pos
 
   in collage windowWidth windowHeight
     [move marioPos <| toForm marioImage]

@@ -172,7 +172,6 @@ Elm.MMMarioClient.make = function (_elm) {
          switch (_v0.ctor)
          {case "_Tuple4":
             return function () {
-                 var rd = Debug.log("WebSocket Recv Data")(_v0._3);
                  var moveAccel = A2(Vector.multVec,
                  {ctor: "_Tuple2"
                  ,_0: Basics.toFloat(_v0._1.x)
@@ -190,11 +189,14 @@ Elm.MMMarioClient.make = function (_elm) {
                     gravityAccel,
                     _v0._2)($)));
                  };
-                 var newMario = Debug.log("new mario")(updateChara(preMario));
+                 var newMario = updateChara(preMario);
+                 var marioPosStr = _L.append("M",
+                 _L.append(String.show(Vector.getx(newMario.pos)),
+                 _L.append(",",
+                 String.show(Vector.gety(newMario.pos)))));
                  return _U.replace([["mario"
                                     ,newMario]
-                                   ,["sendData"
-                                    ,String.show(_v0._0)]],
+                                   ,["sendData",marioPosStr]],
                  gameState);
               }();}
          _E.Case($moduleName,
@@ -269,9 +271,7 @@ Elm.MMMarioClient.make = function (_elm) {
                  {ctor: "_Tuple2"
                  ,_0: 20
                  ,_1: 35});
-                 var marioPos = A2(Debug.log,
-                 "mario pos",
-                 lastGameState.mario.pos);
+                 var marioPos = lastGameState.mario.pos;
                  return A3(Graphics.Collage.collage,
                  _v10._0,
                  _v10._1,
@@ -282,7 +282,7 @@ Elm.MMMarioClient.make = function (_elm) {
       }();
    });
    var requestFps = 1;
-   var gameFps = 60;
+   var gameFps = 1;
    var inputSignal = function () {
       var delta = A2(Signal._op["<~"],
       Time.inSeconds,
@@ -314,9 +314,9 @@ Elm.MMMarioClient.make = function (_elm) {
    Native.Ports.outgoingSignal(function (v) {
       return v;
    }),
-   A2(Signal._op["<~"],
+   Signal.dropRepeats(A2(Signal._op["<~"],
    sendData,
-   gameStateSignal));
+   gameStateSignal)));
    var main = A2(Signal._op["~"],
    A2(Signal._op["<~"],
    display,
