@@ -4,6 +4,9 @@
 <head>
     <title>Massive Multiplay Mario Client By Elm</title>
 
+    <!-- jquery 1.11.0 -->
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
 
@@ -85,6 +88,10 @@
         mmmarioClient.ports.wsSendData.subscribe(function(data) {
             ws.send(data);
         });
+    };
+
+    ws.onerror = function (e) {
+        mmmarioClient.ports.wsRecvData.send('error');
     };
 
 </script>
