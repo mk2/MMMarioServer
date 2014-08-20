@@ -12,7 +12,7 @@
 
 -ifndef(DEBUG).
 %% API
--export([start/2, stop/1, new_player/2, move_player/2]).
+-export([start/2, stop/1, new_player/2, exit_player/1, move_player/2]).
 -else.
 -compile([debug_info, export_all]).
 -endif.
@@ -20,11 +20,14 @@
 start(_StartType, _StartArgs) ->
   mmmario_sup:start_link().
 
-stop(State) ->
-  erlang:error(not_implemented).
+stop(_State) ->
+  ok.
 
 new_player(WSServPid, Name) ->
   mmmario_player_sup:start_player(WSServPid, Name).
+
+exit_player(PPid) ->
+  mmmario_player_sup:exit_player(PPid).
 
 move_player(PPid, Pos = {_, _}) ->
   mmmario_player:move_player(PPid, Pos).

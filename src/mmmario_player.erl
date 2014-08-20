@@ -68,6 +68,7 @@ get_pos(PPid) ->
 %% 初期化後はidle状態にしてプレイヤーからのイベントを待つ
 init([WSServPid, Name]) ->
   HandlerId = mmmario_event_handler:add_handler(),
+  link(WSServPid),
   {ok, move, #pstate{wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
 
 %% 動作可能状態

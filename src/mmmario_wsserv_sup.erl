@@ -37,10 +37,11 @@ start_wsserv() ->
 %%%============================================================================
 
 init([]) ->
+  Port = application:get_env(mmmario, port, 8081),
   MaxR = 60,
   MaxT = 3600,
   % パッシブモードなのは、とりあえず開始時のハンドシェイクはパッシブにやりたいから。
-  {ok, LSock} = gen_tcp:listen(8080, [binary, {active, false}, {packet, http}]),
+  {ok, LSock} = gen_tcp:listen(Port, [binary, {active, false}, {packet, http}]),
   % あらかじめ待機状態にあるwsservを生成しておく。
   spawn_link(fun empty_wsservs/0),
   {ok, {{simple_one_for_one, MaxR, MaxT},

@@ -1,0 +1,9 @@
+{application, mmmario,
+  [{vsn, "1.0.0"},
+    {modules, []},
+    {applications, []},
+    {registered, [mmmario]},
+    {mod, {mmmario, []}},
+    {env,
+      [{port, 8081}]}
+  ]}.

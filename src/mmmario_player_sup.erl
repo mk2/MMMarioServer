@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_player/2, children/0, childPids/0]).
+-export([start_link/0, start_player/2, exit_player/1, children/0, childPids/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -28,6 +28,10 @@ start_link() ->
 
 start_player(WSServPid, Name) ->
   supervisor:start_child(?SERVER, [WSServPid, Name]). % simple_one_for_oneだとArgsの部分が自動で子に渡されるらしい
+
+exit_player(PPid) ->
+  io:format("terminate child: ~p~n", [PPid]),
+  supervisor:terminate_child(?SERVER, PPid).
 
 children() ->
   supervisor:which_children(?SERVER).

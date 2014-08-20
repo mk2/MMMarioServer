@@ -113,7 +113,7 @@ handle_info(?SOCK(Msg), S = #wsservstate{}) ->
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
 %% エラー処理
-%%
+%% といっても終了するだけ
 handle_info({tcp_closed, _CSock}, S = #wsservstate{}) ->
   {stop, normal, S};
 handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
@@ -122,7 +122,7 @@ handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
 %% 未知のメッセージ処理
 %% 無視して別のメッセージを待つ
 handle_info(Msg, S) ->
-  io:format("unexpected msg: ~p~n", [Msg]),
+  error_logger:format("unexpected msg: ~p~n", [Msg]),
   {noreply, S}.
 
 handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
@@ -146,24 +146,23 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
       {ok, PPid} = mmmario:new_player(self(), make_ref()), % キャラクターのFSMを起動しておく
-      link(PPid),
       {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
     {stop, Reason, _} -> {stop, Reason, S};
     _ -> {stop, "failed handshake with unknown reason", S}
   end;
 
 %% テキストメッセージを処理
-%%
+%% こっから全てのイベントの処理が始まる…
+%% アクティブモード onceはあまりよろしくない？
 handle_cast(
     wsrequest,
     S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_TEXT ->
   Data = WSDataFrame#wsdataframe.data,
+  io:format("dataframe: ~p~n", [WSDataFrame]),
   io:format("text data received: ~p~n", [Data]),
-  SendWSDataFrame = encode_ws_dataframe(Data, #{}),
-  io:format("send dataframe: ~p~n", [SendWSDataFrame]),
-  gen_server:cast(self(), {event, mmmario_event_helper:text_to_event(binary:bin_to_list(Data))}), % イベントに変換後、wsserv内で処理する
-  gen_tcp:send(CSock, SendWSDataFrame),
+  Event = mmmario_event_helper:text_to_event(binary:bin_to_list(Data)),
+  gen_server:cast(self(), {event, Event}), % イベントに変換後、wsserv内で処理する
   inet:setopts(CSock, [{active, once}]),
   {noreply, S};
 
@@ -188,6 +187,15 @@ handle_cast(
   inet:setopts(CSock, [{active, once}]),
   {noreply, S};
 
+%% 扱わないOPCODEの場合
+%%
+handle_cast(
+    wsrequest,
+    S = #wsservstate{wsdataframe = WSDataFrame}
+) ->
+  error_logger:format("no handler for: ~p~n", [WSDataFrame]),
+  {noreply, S};
+
 %% 任意のデータ送信。send/2経由で使う
 %% 今のところOpCodeはTEXTになる
 handle_cast(
@@ -197,14 +205,20 @@ handle_cast(
   io:format("data will be sent: ~p~n", [Data]),
   WSDataFrame = encode_ws_dataframe(Data, #{}),
   gen_tcp:send(CSock, WSDataFrame),
-  {noreply, S#wsservstate{wsdataframe = WSDataFrame}}.
+  {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
+
+%% fallback用handle_cast
+handle_cast(Others, S) ->
+  io:format("unexpected casting: ~p~n", [Others]),
+  io:format("wsserv state: ~p~n", [S]),
+  {noreply, S}.
 
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
 terminate(Reason, S = #wsservstate{csock = CSock, ppid = PPid}) ->
   io:format("terminating wsserv with: ~p~n", [Reason]),
-  exit(PPid, normal),
   gen_tcp:close(CSock),
+  mmmario:exit_player(PPid),
   ok.
 
 %% gen_serverコールバック

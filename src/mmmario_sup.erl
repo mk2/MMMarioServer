@@ -47,7 +47,7 @@ init([]) ->
     Restart, Shutdown, supervisor, [mmmario_wsserv_sup]},
 
   EvtMgr = {{local, mmmario_event_handler}, {mmmario_event_handler, start_link, []},
-    Restart, Shutdown, worker, [mmmario_event_handler]},
+    Restart, Shutdown, supervisor, [mmmario_event_handler]},
 
   {ok, {SupFlags, [PlayerSup, WSServSup, EvtMgr]}}.
 
