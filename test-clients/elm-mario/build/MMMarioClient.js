@@ -130,10 +130,10 @@ Elm.MMMarioClient.make = function (_elm) {
    moveAccel,
    fricAccel,
    gravityAccel,
-   jump,
+   willJump,
    m) {
       return function () {
-         var jumpable = jump && m.isTouchOnGround;
+         var jumpable = willJump && m.isTouchOnGround;
          var dFricAccel = A2(Vector.multVec,
          fricAccel,
          delta);
@@ -180,8 +180,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                                ,_1: 100}]
                                              ,["imageBaseName","mario"]
                                              ,["imagePoseName","stand"]
-                                             ,["imageDireName","right"]
-                                             ,["isTouchOnBlock",true]],
+                                             ,["imageDireName","right"]],
                           defaultChara)
                           ,otherCharas: _L.fromArray([])
                           ,screenTileHeight: 10
@@ -245,6 +244,9 @@ Elm.MMMarioClient.make = function (_elm) {
                  numCharas))(A2(takeCycle,
                  2,
                  poss)));
+                 var absRound = function ($) {
+                    return Basics.round(Basics.abs($));
+                 };
                  var moveAccel = Debug.log("moveAccel")(A2(Vector.multVec,
                  {ctor: "_Tuple2"
                  ,_0: Basics.toFloat(_v0._1.x)
@@ -264,16 +266,16 @@ Elm.MMMarioClient.make = function (_elm) {
                  };
                  var newMario = updateChara(preMario);
                  var marioPosStr = _L.append("M",
-                 _L.append(String.show(Vector.getx(newMario.pos)),
+                 _L.append(String.show(absRound(Vector.getx(newMario.pos))),
                  _L.append(",",
-                 String.show(Vector.gety(newMario.pos)))));
+                 String.show(absRound(Vector.gety(newMario.pos))))));
                  return _U.replace([["mario"
                                     ,newMario]
                                    ,["sendData",marioPosStr]],
                  gameState);
               }();}
          _E.Case($moduleName,
-         "between lines 185 and 211");
+         "between lines 184 and 211");
       }();
    });
    var resourceBaseUrl = "resources/";
@@ -295,7 +297,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                        ,chara.imageDireName
                                        ,".png"])));}
          _E.Case($moduleName,
-         "on line 168, column 3 to 116");
+         "on line 167, column 3 to 116");
       }();
    });
    var display = F2(function (_v10,
@@ -332,7 +334,7 @@ Elm.MMMarioClient.make = function (_elm) {
          "between lines 244 and 258");
       }();
    });
-   var requestFps = 1;
+   var requestFps = 30;
    var gameFps = 60;
    var inputSignal = function () {
       var delta = A2(Signal._op["<~"],

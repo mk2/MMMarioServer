@@ -22,7 +22,7 @@ gameFps = 60
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
-requestFps = 1
+requestFps = 30
 
 -- リソースへのアクセスパス
 resourceBaseUrl = "resources/"
@@ -197,8 +197,9 @@ stepGame (delta, arr, space, recvData) gameState =
       -- マリオを更新する
       newMario = updateChara <| preMario
 
+      absRound = round . abs
       -- 送信するマリオのいち情報
-      marioPosStr = "M" ++ (show . getx <| newMario.pos) ++ "," ++ (show . gety <| newMario.pos)
+      marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
 
       -- 別キャラの位置
       poss = split "," recvData

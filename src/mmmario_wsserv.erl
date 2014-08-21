@@ -106,10 +106,11 @@ handle_call(_Request, _From, State) ->
 
 %% 正常なメッセージを裁く関数
 %% ここからメッセージハンドラに流していく
-handle_info(?SOCK(Msg), S = #wsservstate{}) ->
+handle_info(?SOCK(Msg), S = #wsservstate{csock = CSock}) ->
   WSDataFrame = decode_ws_dataframe(Msg),
   io:format("received dataframe: ~p~n", [WSDataFrame]),
-  gen_server:cast(self(), wsrequest),
+  gen_server:cast(self(), {wsrequest, WSDataFrame}),
+  inet:setopts(CSock, [{active, once}]),
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
 %% エラー処理
@@ -125,11 +126,15 @@ handle_info(Msg, S) ->
   error_logger:format("unexpected msg: ~p~n", [Msg]),
   {noreply, S}.
 
+%% eventメッセージをハンドリング
+%%
 handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
   io:format("move request~n"),
   mmmario:move_player(PPid, Args),
   {noreply, S};
 
+%% 未知のイベントをハンドリング
+%%
 handle_cast({event, _Unkonwn}, S = #wsservstate{}) ->
   io:format("unknown event request: ~p~n", [_Unkonwn]),
   {noreply, S};
@@ -155,22 +160,21 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
 %% こっから全てのイベントの処理が始まる…
 %% アクティブモード onceはあまりよろしくない？
 handle_cast(
-    wsrequest,
-    S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
+    {wsrequest, WSDataFrame},
+    S = #wsservstate{csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_TEXT ->
   Data = WSDataFrame#wsdataframe.data,
   io:format("dataframe: ~p~n", [WSDataFrame]),
   io:format("text data received: ~p~n", [Data]),
   Event = mmmario_event_helper:text_to_event(binary:bin_to_list(Data)),
   gen_server:cast(self(), {event, Event}), % イベントに変換後、wsserv内で処理する
-  inet:setopts(CSock, [{active, once}]),
   {noreply, S};
 
 %% クローズメッセージを処理
 %% Socketはterminateの方で閉じる？
 handle_cast(
-    wsrequest,
-    S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
+    {wsrequest, WSDataFrame},
+    S = #wsservstate{csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_CLOSE ->
   io:format("close request received~n"),
   gen_tcp:close(CSock),
@@ -179,19 +183,18 @@ handle_cast(
 %% PINGメッセージを処理
 %% PONGを返す
 handle_cast(
-    wsrequest,
-    S = #wsservstate{wsdataframe = WSDataFrame, csock = CSock}
+    {wsrequest, WSDataFrame},
+    S = #wsservstate{csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_PING ->
   io:format("ping request received~n"),
   gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})),
-  inet:setopts(CSock, [{active, once}]),
   {noreply, S};
 
 %% 扱わないOPCODEの場合
 %%
 handle_cast(
-    wsrequest,
-    S = #wsservstate{wsdataframe = WSDataFrame}
+    {wsrequest, WSDataFrame},
+    S = #wsservstate{}
 ) ->
   error_logger:format("no handler for: ~p~n", [WSDataFrame]),
   {noreply, S};
