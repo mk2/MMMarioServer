@@ -1,4 +1,4 @@
-module Vector where
+module MMMarioVector where
 
 type Vec = (Float, Float)
 

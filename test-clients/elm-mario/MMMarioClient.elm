@@ -10,12 +10,14 @@ import Debug (log)
 import String (split, show)
 
 -- 自作ライブラリのimport
-import Vector (..)
+import MMMarioRenderer as R
+import MMMarioUtil (..)
+import MMMarioType (..)
+import MMMarioVector (..)
 
-{--------------------------------------------------------------------}
-{--
- 設定値
- --}
+{--================================================================--}
+{-- Config --}
+{--================================================================--}
 
 -- ゲームのFPS
 gameFps = 60
@@ -87,41 +89,41 @@ tileWidth = 32
 -- タイルの高さ(px)
 tileHeight = 32
 
-{--------------------------------------------------------------------}
-{--
- ゲームで使う型
- --}
-data RenderType = RChara | RBlock | RItem
+{--================================================================--}
+{-- Signals --}
+{--================================================================--}
 
-type Chara = {
-               pos : Vec
-             , spd : Vec
-             , acc : Vec
-             , isTouchOnTopBlock : Bool
-             , isTouchOnLeftBlock : Bool
-             , isTouchOnDownBlock : Bool
-             , isTouchOnRightBlock : Bool
-             , isTouchOnGround : Bool
-             , mass : Float
-             , imageBaseName : String
-             , imagePoseName : String
-             , imageDireName : String
-             }
+-- WebSocketからの受信データ
+port wsRecvData : Signal String
 
-type GameState = {
-                   mario : Chara
-                 , stageTileWidth : Float
-                 , stageTileHeight : Float
-                 , screenTileWidth : Float
-                 , screenTileHeight : Float
-                 , otherCharas : [(String, Chara)]
-                 , sendData : String
-                 }
+-- 入力シグナル
+-- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー, WSからの受信データ) を取得
+inputSignal =
+  let delta = inSeconds <~ fps gameFps
+      keySignal = (,,,) <~ delta
+                         ~ Keyboard.arrows
+                         ~ Keyboard.space
+                         ~ wsRecvData
+  in sampleOn delta keySignal
 
-type UserInput = {
-                   arr : {x : Int, y : Int}
-                 , space : Bool
-                 }
+-- ゲーム状態のシグナル
+-- foldpでシグナルにする
+gameStateSignal : Signal GameState
+gameStateSignal = foldp stepGame initialGameState inputSignal
+
+-- gameStateからsendDataを取り出すための関数
+sendData gameState = gameState.sendData
+
+-- サーバーへ送るデータ
+-- WebSocketコネクションはJSでハンドリング
+port wsSendData : Signal String
+port wsSendData = let sendData = (\gameState -> gameState.sendData)
+                      delta = inSeconds <~ fps requestFps
+                  in dropRepeats <| sampleOn delta <| sendData <~ gameStateSignal
+
+{--================================================================--}
+{-- 処理関数 --}
+{--================================================================--}
 
 -- キャラクターの加速度を計算
 -- 計算方法
@@ -165,17 +167,6 @@ updateCharaImage m =
 getImage chara (w, h) =
   image w h (concat [imageBaseUrl, chara.imageBaseName, "-", chara.imagePoseName, "-", chara.imageDireName, ".png"])
 
--- リストをタプルに。
--- ex: [1, 2] -> (1, 2)
-list2tuple l = (head l, last l)
-
--- lのリストをnつずつのタプルのリストに分解する
-takeCycle n l =  takeCycle' n l []
-takeCycle' n l accum =
-    let notEnough = (length l) < n
-    in  if | notEnough -> accum
-           | otherwise -> takeCycle' n (drop n l) (accum ++ [list2tuple <| (take n l)])
-
 -- ゲーム関数
 -- (更新秒, (矢印キー上下, 矢印キー左右), キーボード) -> ゲームステート -> ゲームステート
 stepGame : (Float, {x : Int, y : Int}, Bool, String) -> GameState -> GameState
@@ -196,7 +187,6 @@ stepGame (delta, arr, space, recvData) gameState =
       -- マリオを更新する
       newMario = updateChara preMario
 
-      absRound = round . abs
       -- 送信するマリオの位置情報
       marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
 
@@ -208,34 +198,6 @@ stepGame (delta, arr, space, recvData) gameState =
   in { gameState | mario <- newMario
                  , sendData <- marioPosStr
      }
-
--- WebSocketからの受信データ
-port wsRecvData : Signal String
-
--- 入力シグナル
--- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー, WSからの受信データ) を取得
-inputSignal =
-  let delta = inSeconds <~ fps gameFps
-      keySignal = (,,,) <~ delta
-                         ~ Keyboard.arrows
-                         ~ Keyboard.space
-                         ~ wsRecvData
-  in sampleOn delta keySignal
-
--- ゲーム状態のシグナル
--- foldpでシグナルにする
-gameStateSignal : Signal GameState
-gameStateSignal = foldp stepGame initialGameState inputSignal
-
--- gameStateからsendDataを取り出すための関数
-sendData gameState = gameState.sendData
-
--- サーバーへ送るデータ
--- WebSocketコネクションはJSでハンドリング
-port wsSendData : Signal String
-port wsSendData = let sendData = (\gameState -> gameState.sendData)
-                      delta = inSeconds <~ fps requestFps
-                  in dropRepeats <| sampleOn delta <| sendData <~ gameStateSignal
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Form
