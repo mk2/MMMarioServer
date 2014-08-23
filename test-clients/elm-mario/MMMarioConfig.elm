@@ -1,13 +1,24 @@
 module MMMarioConfig where
 
+import MMMarioType (..)
 import MMMarioVector (..)
 
 {--================================================================--}
 {-- Config --}
 {--================================================================--}
 
+-- サンプルマップ
+sampleStageTiles : [[StageTile]]
+sampleStageTiles = [(repeat 10 Ground)] ++ (repeat 9 . repeat 10 <| None)
+
 -- 背景色
 bgColor = rgb 160 216 239
+
+-- 雲の色
+cldColor = rgb 255 255 255
+
+-- 土の色
+gndColor = rgb 188 118 71
 
 -- ゲームのFPS
 gameFps = 60
@@ -17,10 +28,10 @@ gameFps = 60
 requestFps = 0.2
 
 -- タイルの幅(px)
-tileWidth = 32
+tileWidth = 64
 
 -- タイルの高さ(px)
-tileHeight = 32
+tileHeight = 64
 
 -- リソースへのアクセスパス
 resourceBaseUrl = "resources/"
@@ -61,7 +72,7 @@ initialGameState = {
                                             }
                    , stageTileWidth = 200
                    , stageTileHeight = 100
-                   , stageTiles = []
+                   , stageTiles = sampleStageTiles
                    , screenTileWidth = 10
                    , screenTileHeight = 10
                    , sendData = ""
@@ -75,7 +86,7 @@ marioJumpAccel = (0, 2000)
 gravityAccel = (0, -900)
 
 -- 摩擦係数
-fricCoeff = 2
+fricCoeff = 10
 
 -- マリオ移動加速度係数
-moveCoeff = 2000
+moveCoeff = 500

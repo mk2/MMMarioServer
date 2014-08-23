@@ -1,5 +1,10 @@
 module MMMarioClient where
 
+{--
+@author mk2
+@description
+ --}
+
 import Graphics.Input (Input, input, button)
 import Window
 import Keyboard

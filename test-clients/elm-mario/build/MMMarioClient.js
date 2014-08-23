@@ -147,7 +147,7 @@ Elm.MMMarioClient.make = function (_elm) {
                     }();
             }
             _E.Case($moduleName,
-                "between lines 97 and 123");
+                "between lines 102 and 128");
         }();
     });
     var sendData = function (gameState) {
@@ -215,6 +215,7 @@ Elm.MMMarioRenderer.make = function (_elm) {
         _A = _N.Array.make(_elm),
         _E = _N.Error.make(_elm),
         $moduleName = "MMMarioRenderer";
+    var Array = Elm.Array.make(_elm);
     var Basics = Elm.Basics.make(_elm);
     var Color = Elm.Color.make(_elm);
     var Graphics = Graphics || {};
@@ -234,24 +235,58 @@ Elm.MMMarioRenderer.make = function (_elm) {
     var Text = Elm.Text.make(_elm);
     var Time = Elm.Time.make(_elm);
     var _op = {};
-    var renderStage = F2(function (_v0, stageTiles) {
+    var renderTile = F2(function (moveXY, stageTile) {
         return function () {
-            switch (_v0.ctor) {
-                case "_Tuple2":
-                    return !_U.eq(_v0._0 * _v0._1,
-                        List.length(stageTiles)) ? Graphics.Collage.toForm(Text.leftAligned(Text.toText("no data"))) : Graphics.Collage.toForm(Text.centered(Text.toText("ok data")));
+            switch (stageTile.ctor) {
+                case "Cloud":
+                    return Maybe.Just(Graphics.Collage.move(moveXY)(Graphics.Collage.filled(MMMarioConfig.cldColor)(A2(Graphics.Collage.rect,
+                        Basics.toFloat(MMMarioConfig.tileWidth),
+                        Basics.toFloat(MMMarioConfig.tileHeight)))));
+                case "Ground":
+                    return Maybe.Just(Graphics.Collage.move(moveXY)(Graphics.Collage.filled(MMMarioConfig.gndColor)(A2(Graphics.Collage.rect,
+                        Basics.toFloat(MMMarioConfig.tileWidth),
+                        Basics.toFloat(MMMarioConfig.tileHeight)))));
+                case "None":
+                    return Maybe.Nothing;
             }
-            _E.Case($moduleName,
-                "between lines 40 and 41");
+            return Maybe.Nothing;
         }();
     });
-    var getImage = F2(function (chara, _v4) {
+    var renderTileRow = F2(function (row, stageTiles) {
         return function () {
-            switch (_v4.ctor) {
+            var my = Basics.toFloat(MMMarioConfig.tileHeight * row);
+            return Array.toList(A2(Array.indexedMap,
+                F2(function (mx, stageTile) {
+                    return A2(renderTile,
+                        {ctor: "_Tuple2", _0: Basics.toFloat(MMMarioConfig.tileWidth * mx), _1: my},
+                        stageTile);
+                }),
+                Array.fromList(stageTiles)));
+        }();
+    });
+    var renderStage = F2(function (_v1, stageTileRows) {
+        return function () {
+            switch (_v1.ctor) {
+                case "_Tuple2":
+                    return Graphics.Collage.group(Array.toList(A2(Array.indexedMap,
+                        F2(function (row, stageTileRow) {
+                            return Graphics.Collage.group(Maybe.justs(A2(renderTileRow,
+                                row,
+                                stageTileRow)));
+                        }),
+                        Array.fromList(stageTileRows))));
+            }
+            _E.Case($moduleName,
+                "on line 41, column 5 to 128");
+        }();
+    });
+    var getImage = F2(function (chara, _v5) {
+        return function () {
+            switch (_v5.ctor) {
                 case "_Tuple2":
                     return A3(Graphics.Element.image,
-                        _v4._0,
-                        _v4._1,
+                        _v5._0,
+                        _v5._1,
                         List.concat(_L.fromArray([MMMarioConfig.imageBaseUrl
                             , chara.imageBaseName
                             , "-"
@@ -261,24 +296,24 @@ Elm.MMMarioRenderer.make = function (_elm) {
                             , ".png"])));
             }
             _E.Case($moduleName,
-                "on line 10, column 3 to 116");
+                "on line 11, column 3 to 116");
         }();
     });
-    var render = F2(function (_v8, gameState) {
+    var render = F2(function (_v9, gameState) {
         return function () {
-            switch (_v8.ctor) {
+            switch (_v9.ctor) {
                 case "_Tuple2":
                     return function () {
-                        var moveToY = Basics.toFloat(((0 - _v8._1) / 2 | 0) + 100);
-                        var moveToX = Basics.toFloat((0 - _v8._0) / 2 | 0);
+                        var moveToY = Basics.toFloat((0 - _v9._1) / 2 | 0);
+                        var moveToX = Basics.toFloat((0 - _v9._0) / 2 | 0);
                         var stageForm = A2(renderStage,
                             {ctor: "_Tuple2", _0: 0, _1: 0},
-                            _L.fromArray([]));
+                            gameState.stageTiles);
                         var bgForm = Graphics.Collage.filled(MMMarioConfig.bgColor)(A2(Graphics.Collage.rect,
-                            Basics.toFloat(_v8._0),
-                            Basics.toFloat(_v8._1)));
-                        var screenTileHeight = _v8._1 / MMMarioConfig.tileHeight | 0;
-                        var screenTileWidth = _v8._0 / MMMarioConfig.tileWidth | 0;
+                            Basics.toFloat(_v9._0),
+                            Basics.toFloat(_v9._1)));
+                        var screenTileHeight = _v9._1 / MMMarioConfig.tileHeight | 0;
+                        var screenTileWidth = _v9._0 / MMMarioConfig.tileWidth | 0;
                         var lastGameState = _U.replace([
                                 ["screenTileWidth"
                                     , screenTileWidth]
@@ -294,17 +329,17 @@ Elm.MMMarioRenderer.make = function (_elm) {
                         var stageWholeForm = Graphics.Collage.move({ctor: "_Tuple2", _0: moveToX, _1: moveToY})(Graphics.Collage.group(_L.fromArray([stageForm
                             , marioForm])));
                         return A3(Graphics.Collage.collage,
-                            _v8._0,
-                            _v8._1,
+                            _v9._0,
+                            _v9._1,
                             _L.fromArray([bgForm
                                 , stageWholeForm]));
                     }();
             }
             _E.Case($moduleName,
-                "between lines 15 and 36");
+                "between lines 16 and 37");
         }();
     });
-    _elm.MMMarioRenderer.values = {_op: _op, getImage: getImage, render: render, renderStage: renderStage};
+    _elm.MMMarioRenderer.values = {_op: _op, getImage: getImage, render: render, renderStage: renderStage, renderTileRow: renderTileRow, renderTile: renderTile};
     return _elm.MMMarioRenderer.values;
 };
 Elm.MMMarioConfig = Elm.MMMarioConfig || {};
@@ -326,6 +361,7 @@ Elm.MMMarioConfig.make = function (_elm) {
     var Graphics = Graphics || {};
     Graphics.Element = Elm.Graphics.Element.make(_elm);
     var List = Elm.List.make(_elm);
+    var MMMarioType = Elm.MMMarioType.make(_elm);
     var MMMarioVector = Elm.MMMarioVector.make(_elm);
     var Maybe = Elm.Maybe.make(_elm);
     var Native = Native || {};
@@ -337,11 +373,38 @@ Elm.MMMarioConfig.make = function (_elm) {
     var Text = Elm.Text.make(_elm);
     var Time = Elm.Time.make(_elm);
     var _op = {};
-    var moveCoeff = 2000;
-    var fricCoeff = 2;
+    var moveCoeff = 500;
+    var fricCoeff = 10;
     var gravityAccel = {ctor: "_Tuple2", _0: 0, _1: -900};
     var marioJumpAccel = {ctor: "_Tuple2", _0: 0, _1: 2000};
     var defaultChara = {_: {}, acc: MMMarioVector.zero, imageBaseName: "", imageDireName: "", imagePoseName: "", isTouchOnDownBlock: false, isTouchOnGround: false, isTouchOnLeftBlock: false, isTouchOnRightBlock: false, isTouchOnTopBlock: false, mass: 100, pos: MMMarioVector.zero, spd: MMMarioVector.zero};
+    var minSpd = {ctor: "_Tuple2", _0: -10, _1: -10};
+    var maxSpd = {ctor: "_Tuple2", _0: 10, _1: 10};
+    var minPos = {ctor: "_Tuple2", _0: 0, _1: 0};
+    var maxPos = {ctor: "_Tuple2", _0: 10000, _1: 10000};
+    var resourceBaseUrl = "resources/";
+    var imageBaseUrl = _L.append(resourceBaseUrl,
+        "images/");
+    var tileHeight = 64;
+    var tileWidth = 64;
+    var requestFps = 0.2;
+    var gameFps = 60;
+    var gndColor = A3(Color.rgb,
+        188,
+        118,
+        71);
+    var cldColor = A3(Color.rgb,
+        255,
+        255,
+        255);
+    var bgColor = A3(Color.rgb,
+        160,
+        216,
+        239);
+    var sampleStageTiles = _L.append(_L.fromArray([A2(List.repeat,
+            10,
+            MMMarioType.Ground)]),
+        List.repeat(9)(List.repeat(10)(MMMarioType.None)));
     var initialGameState = {_: {}, mario: _U.replace([
             ["pos"
                 , {ctor: "_Tuple2", _0: 0, _1: 100}]
@@ -354,23 +417,8 @@ Elm.MMMarioConfig.make = function (_elm) {
             ,
             ["imageDireName", "right"]
         ],
-        defaultChara), otherCharas: _L.fromArray([]), screenTileHeight: 10, screenTileWidth: 10, sendData: "", stageTileHeight: 100, stageTileWidth: 200, stageTiles: _L.fromArray([])};
-    var minSpd = {ctor: "_Tuple2", _0: -10, _1: -10};
-    var maxSpd = {ctor: "_Tuple2", _0: 10, _1: 10};
-    var minPos = {ctor: "_Tuple2", _0: 0, _1: 0};
-    var maxPos = {ctor: "_Tuple2", _0: 10000, _1: 10000};
-    var resourceBaseUrl = "resources/";
-    var imageBaseUrl = _L.append(resourceBaseUrl,
-        "images/");
-    var tileHeight = 32;
-    var tileWidth = 32;
-    var requestFps = 0.2;
-    var gameFps = 60;
-    var bgColor = A3(Color.rgb,
-        160,
-        216,
-        239);
-    _elm.MMMarioConfig.values = {_op: _op, bgColor: bgColor, gameFps: gameFps, requestFps: requestFps, tileWidth: tileWidth, tileHeight: tileHeight, resourceBaseUrl: resourceBaseUrl, imageBaseUrl: imageBaseUrl, maxPos: maxPos, minPos: minPos, maxSpd: maxSpd, minSpd: minSpd, defaultChara: defaultChara, initialGameState: initialGameState, marioJumpAccel: marioJumpAccel, gravityAccel: gravityAccel, fricCoeff: fricCoeff, moveCoeff: moveCoeff};
+        defaultChara), otherCharas: _L.fromArray([]), screenTileHeight: 10, screenTileWidth: 10, sendData: "", stageTileHeight: 100, stageTileWidth: 200, stageTiles: sampleStageTiles};
+    _elm.MMMarioConfig.values = {_op: _op, sampleStageTiles: sampleStageTiles, bgColor: bgColor, cldColor: cldColor, gndColor: gndColor, gameFps: gameFps, requestFps: requestFps, tileWidth: tileWidth, tileHeight: tileHeight, resourceBaseUrl: resourceBaseUrl, imageBaseUrl: imageBaseUrl, maxPos: maxPos, minPos: minPos, maxSpd: maxSpd, minSpd: minSpd, defaultChara: defaultChara, initialGameState: initialGameState, marioJumpAccel: marioJumpAccel, gravityAccel: gravityAccel, fricCoeff: fricCoeff, moveCoeff: moveCoeff};
     return _elm.MMMarioConfig.values;
 };
 Elm.MMMarioType = Elm.MMMarioType || {};
@@ -436,10 +484,11 @@ Elm.MMMarioType.make = function (_elm) {
     });
     var Ground = {ctor: "Ground"};
     var Cloud = {ctor: "Cloud"};
+    var None = {ctor: "None"};
     var RItem = {ctor: "RItem"};
     var RBlock = {ctor: "RBlock"};
     var RChara = {ctor: "RChara"};
-    _elm.MMMarioType.values = {_op: _op, RChara: RChara, RBlock: RBlock, RItem: RItem, Cloud: Cloud, Ground: Ground, UserInput: UserInput, Chara: Chara, GameState: GameState};
+    _elm.MMMarioType.values = {_op: _op, RChara: RChara, RBlock: RBlock, RItem: RItem, None: None, Cloud: Cloud, Ground: Ground, UserInput: UserInput, Chara: Chara, GameState: GameState};
     return _elm.MMMarioType.values;
 };
 Elm.MMMarioUtil = Elm.MMMarioUtil || {};

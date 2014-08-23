@@ -4,7 +4,7 @@ import MMMarioVector (..)
 
 data RenderType = RChara | RBlock | RItem
 
-data StageTile = Cloud | Ground
+data StageTile = None | Cloud | Ground
 
 type UserInput = {
                    arr : {x : Int, y : Int}
@@ -30,7 +30,7 @@ type GameState = {
                    mario : Chara
                  , stageTileWidth : Float
                  , stageTileHeight : Float
-                 , stageTiles : [StageTile]
+                 , stageTiles : [[StageTile]]
                  , screenTileWidth : Float
                  , screenTileHeight : Float
                  , otherCharas : [(String, Chara)]
