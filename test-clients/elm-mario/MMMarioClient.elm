@@ -10,84 +10,11 @@ import Debug (log)
 import String (split, show)
 
 -- 自作ライブラリのimport
-import MMMarioRenderer as R
+import MMMarioVector (..)
 import MMMarioUtil (..)
 import MMMarioType (..)
-import MMMarioVector (..)
-
-{--================================================================--}
-{-- Config --}
-{--================================================================--}
-
--- ゲームのFPS
-gameFps = 60
-
--- サーバーへの送信FPS
--- 上げるとすぐ死ぬので注意
-requestFps = 0.2
-
--- リソースへのアクセスパス
-resourceBaseUrl = "resources/"
-
-imageBaseUrl = resourceBaseUrl ++ "images/"
-
--- 最大位置
-maxPos = (10000, 10000)
-minPos = (0, 0)
-
--- 最大速度
-maxSpd = (10, 10)
-minSpd = (-10, -10)
-
--- 標準のキャラクター
-defaultChara = {
-                 pos = zero
-               , spd = zero
-               , acc = zero
-               , isTouchOnGround = False
-               , isTouchOnTopBlock = False
-               , isTouchOnLeftBlock = False
-               , isTouchOnDownBlock = False
-               , isTouchOnRightBlock = False
-               , mass = 100
-               , imageBaseName = ""
-               , imagePoseName = ""
-               , imageDireName = ""
-               }
-
--- ゲームの初期状態
-initialGameState = {
-                     mario = { defaultChara | pos <- (0, 100)
-                                            , isTouchOnGround <- False
-                                            , imageBaseName <- "mario"
-                                            , imagePoseName <- "stand"
-                                            , imageDireName <- "right"
-                                            }
-                   , stageTileWidth = 200
-                   , stageTileHeight = 100
-                   , screenTileWidth = 10
-                   , screenTileHeight = 10
-                   , sendData = ""
-                   , otherCharas = []
-                   }
-
--- マリオのジャンプ加速度
-marioJumpAccel = (0, 2000)
-
--- 重力加速度
-gravityAccel = (0, -900)
-
--- 摩擦係数
-fricCoeff = 2
-
--- マリオ移動加速度係数
-moveCoeff = 2000
-
--- タイルの幅(px)
-tileWidth = 32
-
--- タイルの高さ(px)
-tileHeight = 32
+import MMMarioRenderer as R
+import MMMarioConfig (..)
 
 {--================================================================--}
 {-- Signals --}
@@ -163,10 +90,6 @@ calcCharaPos delta m =
 updateCharaImage m =
   m
 
--- キャラクターイメージの取得
-getImage chara (w, h) =
-  image w h (concat [imageBaseUrl, chara.imageBaseName, "-", chara.imagePoseName, "-", chara.imageDireName, ".png"])
-
 -- ゲーム関数
 -- (更新秒, (矢印キー上下, 矢印キー左右), キーボード) -> ゲームステート -> ゲームステート
 stepGame : (Float, {x : Int, y : Int}, Bool, String) -> GameState -> GameState
@@ -200,23 +123,8 @@ stepGame (delta, arr, space, recvData) gameState =
      }
 
 -- ディスプレイ関数
--- (ウィンドウサイズ) -> ゲームステート -> Form
-display (windowWidth, windowHeight) gameState =
-  let
-
-      -- スクリーンタイルサイズ
-      screenTileWidth = (/) tileWidth <| toFloat windowWidth
-      screenTileHeight = (/) tileHeight <| toFloat windowHeight
-
-      lastGameState = { gameState | screenTileWidth <- screenTileWidth
-                                  , screenTileHeight <- screenTileHeight
-                                  }
-
-      marioImage = getImage lastGameState.mario (20, 35)
-      marioPos = lastGameState.mario.pos
-
-  in collage windowWidth windowHeight
-    [move marioPos <| toForm marioImage]
+-- (ウィンドウサイズ) -> ゲームステート -> Element
+display windowSize gameState = R.render windowSize gameState
 
 -- エントリーポイント
 main = display <~ Window.dimensions

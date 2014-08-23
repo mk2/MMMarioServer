@@ -21,6 +21,7 @@ Elm.MMMarioClient.make = function (_elm) {
     Graphics.Input = Elm.Graphics.Input.make(_elm);
     var Keyboard = Elm.Keyboard.make(_elm);
     var List = Elm.List.make(_elm);
+    var MMMarioConfig = Elm.MMMarioConfig.make(_elm);
     var MMMarioRenderer = Elm.MMMarioRenderer.make(_elm);
     var MMMarioType = Elm.MMMarioType.make(_elm);
     var MMMarioUtil = Elm.MMMarioUtil.make(_elm);
@@ -37,65 +38,19 @@ Elm.MMMarioClient.make = function (_elm) {
     var WebSocket = Elm.WebSocket.make(_elm);
     var Window = Elm.Window.make(_elm);
     var _op = {};
+    var display = F2(function (windowSize, gameState) {
+        return A2(MMMarioRenderer.render,
+            windowSize,
+            gameState);
+    });
     var updateCharaImage = function (m) {
         return m;
     };
-    var sendData = function (gameState) {
-        return gameState.sendData;
-    };
-    var wsRecvData = Native.Ports.portIn("wsRecvData",
-        Native.Ports.incomingSignal(function (v) {
-            return typeof v === "string" || typeof v === "object" && v instanceof String ? v : _E.raise("invalid input, expecting JSString but got " + v);
-        }));
-    var tileHeight = 32;
-    var tileWidth = 32;
-    var moveCoeff = 2000;
-    var fricCoeff = 2;
-    var gravityAccel = {ctor: "_Tuple2", _0: 0, _1: -900};
-    var marioJumpAccel = {ctor: "_Tuple2", _0: 0, _1: 2000};
-    var calcCharaAccel = F6(function (delta, moveAccel, fricAccel, gravityAccel, willJump, m) {
-        return function () {
-            var jumpable = willJump && m.isTouchOnGround;
-            return jumpable ? _U.replace([
-                    ["acc"
-                        , marioJumpAccel]
-                ],
-                m) : Basics.not(m.isTouchOnGround) ? _U.replace([
-                    ["acc"
-                        , A2(MMMarioVector.addVec,
-                        fricAccel,
-                        gravityAccel)]
-                ],
-                m) : _U.replace([
-                    ["acc"
-                        , MMMarioVector.addVec(moveAccel)(MMMarioVector.addVec(fricAccel)(gravityAccel))]
-                ],
-                m);
-        }();
-    });
-    var defaultChara = {_: {}, acc: MMMarioVector.zero, imageBaseName: "", imageDireName: "", imagePoseName: "", isTouchOnDownBlock: false, isTouchOnGround: false, isTouchOnLeftBlock: false, isTouchOnRightBlock: false, isTouchOnTopBlock: false, mass: 100, pos: MMMarioVector.zero, spd: MMMarioVector.zero};
-    var initialGameState = {_: {}, mario: _U.replace([
-            ["pos"
-                , {ctor: "_Tuple2", _0: 0, _1: 100}]
-            ,
-            ["isTouchOnGround", false]
-            ,
-            ["imageBaseName", "mario"]
-            ,
-            ["imagePoseName", "stand"]
-            ,
-            ["imageDireName", "right"]
-        ],
-        defaultChara), otherCharas: _L.fromArray([]), screenTileHeight: 10, screenTileWidth: 10, sendData: "", stageTileHeight: 100, stageTileWidth: 200};
-    var minSpd = {ctor: "_Tuple2", _0: -10, _1: -10};
-    var maxSpd = {ctor: "_Tuple2", _0: 10, _1: 10};
-    var minPos = {ctor: "_Tuple2", _0: 0, _1: 0};
-    var maxPos = {ctor: "_Tuple2", _0: 10000, _1: 10000};
     var calcCharaPos = F2(function (delta, m) {
         return function () {
             var $ = A2(MMMarioVector.clampVec,
-                    minSpd,
-                    maxSpd)(MMMarioVector.addVec(m.spd)(MMMarioVector.multVec(delta)(m.acc))),
+                    MMMarioConfig.minSpd,
+                    MMMarioConfig.maxSpd)(MMMarioVector.addVec(m.spd)(MMMarioVector.multVec(delta)(m.acc))),
                 sx = $._0,
                 sy = $._1;
             var $ = A2(MMMarioVector.addVec,
@@ -107,8 +62,8 @@ Elm.MMMarioClient.make = function (_elm) {
                 0) < 0 ? _U.replace([
                     ["pos"
                         , A3(MMMarioVector.clampVec,
-                        minPos,
-                        maxPos,
+                        MMMarioConfig.minPos,
+                        MMMarioConfig.maxPos,
                         {ctor: "_Tuple2", _0: nx, _1: 0})]
                     ,
                     ["spd"
@@ -119,12 +74,32 @@ Elm.MMMarioClient.make = function (_elm) {
                 m) : _U.replace([
                     ["pos"
                         , A3(MMMarioVector.clampVec,
-                        minPos,
-                        maxPos,
+                        MMMarioConfig.minPos,
+                        MMMarioConfig.maxPos,
                         {ctor: "_Tuple2", _0: nx, _1: ny})]
                     ,
                     ["spd"
                         , {ctor: "_Tuple2", _0: sx, _1: sy}]
+                ],
+                m);
+        }();
+    });
+    var calcCharaAccel = F6(function (delta, moveAccel, fricAccel, gravityAccel, willJump, m) {
+        return function () {
+            var jumpable = willJump && m.isTouchOnGround;
+            return jumpable ? _U.replace([
+                    ["acc"
+                        , MMMarioConfig.marioJumpAccel]
+                ],
+                m) : Basics.not(m.isTouchOnGround) ? _U.replace([
+                    ["acc"
+                        , A2(MMMarioVector.addVec,
+                        fricAccel,
+                        gravityAccel)]
+                ],
+                m) : _U.replace([
+                    ["acc"
+                        , MMMarioVector.addVec(moveAccel)(MMMarioVector.addVec(fricAccel)(gravityAccel))]
                 ],
                 m);
         }();
@@ -143,18 +118,18 @@ Elm.MMMarioClient.make = function (_elm) {
                             2,
                             poss)));
                         var moveAccel = A2(MMMarioVector.multVec,
-                            moveCoeff,
+                            MMMarioConfig.moveCoeff,
                             {ctor: "_Tuple2", _0: Basics.toFloat(_v0._1.x), _1: 0});
                         var preMario = gameState.mario;
                         var fricAccel = A2(MMMarioVector.multVec,
-                            fricCoeff,
+                            MMMarioConfig.fricCoeff,
                             MMMarioVector.revVec(preMario.spd));
                         var updateChara = function ($) {
                             return updateCharaImage(calcCharaPos(_v0._0)(A5(calcCharaAccel,
                                 _v0._0,
                                 moveAccel,
                                 fricAccel,
-                                gravityAccel,
+                                MMMarioConfig.gravityAccel,
                                 _v0._2)($)));
                         };
                         var newMario = updateChara(preMario);
@@ -172,70 +147,20 @@ Elm.MMMarioClient.make = function (_elm) {
                     }();
             }
             _E.Case($moduleName,
-                "between lines 174 and 200");
+                "between lines 97 and 123");
         }();
     });
-    var resourceBaseUrl = "resources/";
-    var imageBaseUrl = _L.append(resourceBaseUrl,
-        "images/");
-    var getImage = F2(function (chara, _v6) {
-        return function () {
-            switch (_v6.ctor) {
-                case "_Tuple2":
-                    return A3(Graphics.Element.image,
-                        _v6._0,
-                        _v6._1,
-                        List.concat(_L.fromArray([imageBaseUrl
-                            , chara.imageBaseName
-                            , "-"
-                            , chara.imagePoseName
-                            , "-"
-                            , chara.imageDireName
-                            , ".png"])));
-            }
-            _E.Case($moduleName,
-                "on line 168, column 3 to 116");
-        }();
-    });
-    var display = F2(function (_v10, gameState) {
-        return function () {
-            switch (_v10.ctor) {
-                case "_Tuple2":
-                    return function () {
-                        var screenTileHeight = F2(function (x, y) {
-                            return x / y;
-                        })(tileHeight)(Basics.toFloat(_v10._1));
-                        var screenTileWidth = F2(function (x, y) {
-                            return x / y;
-                        })(tileWidth)(Basics.toFloat(_v10._0));
-                        var lastGameState = _U.replace([
-                                ["screenTileWidth"
-                                    , screenTileWidth]
-                                ,
-                                ["screenTileHeight"
-                                    , screenTileHeight]
-                            ],
-                            gameState);
-                        var marioImage = A2(getImage,
-                            lastGameState.mario,
-                            {ctor: "_Tuple2", _0: 20, _1: 35});
-                        var marioPos = lastGameState.mario.pos;
-                        return A3(Graphics.Collage.collage,
-                            _v10._0,
-                            _v10._1,
-                            _L.fromArray([Graphics.Collage.move(marioPos)(Graphics.Collage.toForm(marioImage))]));
-                    }();
-            }
-            _E.Case($moduleName,
-                "between lines 205 and 219");
-        }();
-    });
-    var requestFps = 0.2;
-    var gameFps = 60;
+    var sendData = function (gameState) {
+        return gameState.sendData;
+    };
+    var wsRecvData = Native.Ports.portIn("wsRecvData",
+        Native.Ports.incomingSignal(function (v) {
+            return typeof v === "string" || typeof v === "object" && v instanceof String ? v : _E.raise("invalid input, expecting JSString but got " + v);
+        }));
     var inputSignal = function () {
         var delta = A2(Signal._op["<~"],
             Time.inSeconds,
-            Time.fps(gameFps));
+            Time.fps(MMMarioConfig.gameFps));
         var keySignal = A2(Signal._op["~"],
             A2(Signal._op["~"],
                 A2(Signal._op["~"],
@@ -253,7 +178,7 @@ Elm.MMMarioClient.make = function (_elm) {
     }();
     var gameStateSignal = A3(Signal.foldp,
         stepGame,
-        initialGameState,
+        MMMarioConfig.initialGameState,
         inputSignal);
     var wsSendData = Native.Ports.portOut("wsSendData",
         Native.Ports.outgoingSignal(function (v) {
@@ -262,7 +187,7 @@ Elm.MMMarioClient.make = function (_elm) {
         function () {
             var delta = A2(Signal._op["<~"],
                 Time.inSeconds,
-                Time.fps(requestFps));
+                Time.fps(MMMarioConfig.requestFps));
             var sendData = function (gameState) {
                 return gameState.sendData;
             };
@@ -275,7 +200,7 @@ Elm.MMMarioClient.make = function (_elm) {
             display,
             Window.dimensions),
         gameStateSignal);
-    _elm.MMMarioClient.values = {_op: _op, gameFps: gameFps, requestFps: requestFps, resourceBaseUrl: resourceBaseUrl, imageBaseUrl: imageBaseUrl, maxPos: maxPos, minPos: minPos, maxSpd: maxSpd, minSpd: minSpd, defaultChara: defaultChara, initialGameState: initialGameState, marioJumpAccel: marioJumpAccel, gravityAccel: gravityAccel, fricCoeff: fricCoeff, moveCoeff: moveCoeff, tileWidth: tileWidth, tileHeight: tileHeight, inputSignal: inputSignal, gameStateSignal: gameStateSignal, sendData: sendData, calcCharaAccel: calcCharaAccel, calcCharaPos: calcCharaPos, updateCharaImage: updateCharaImage, getImage: getImage, stepGame: stepGame, display: display, main: main};
+    _elm.MMMarioClient.values = {_op: _op, inputSignal: inputSignal, gameStateSignal: gameStateSignal, sendData: sendData, calcCharaAccel: calcCharaAccel, calcCharaPos: calcCharaPos, updateCharaImage: updateCharaImage, stepGame: stepGame, display: display, main: main};
     return _elm.MMMarioClient.values;
 };
 Elm.MMMarioRenderer = Elm.MMMarioRenderer || {};
@@ -297,6 +222,8 @@ Elm.MMMarioRenderer.make = function (_elm) {
     var Graphics = Graphics || {};
     Graphics.Element = Elm.Graphics.Element.make(_elm);
     var List = Elm.List.make(_elm);
+    var MMMarioConfig = Elm.MMMarioConfig.make(_elm);
+    var MMMarioType = Elm.MMMarioType.make(_elm);
     var Maybe = Elm.Maybe.make(_elm);
     var Native = Native || {};
     Native.Json = Elm.Native.Json.make(_elm);
@@ -307,14 +234,144 @@ Elm.MMMarioRenderer.make = function (_elm) {
     var Text = Elm.Text.make(_elm);
     var Time = Elm.Time.make(_elm);
     var _op = {};
-    var render = function (gameState) {
-        return gameState;
-    };
-    var RItem = {ctor: "RItem"};
-    var RBlock = {ctor: "RBlock"};
-    var RChara = {ctor: "RChara"};
-    _elm.MMMarioRenderer.values = {_op: _op, render: render, RChara: RChara, RBlock: RBlock, RItem: RItem};
+    var renderStage = F2(function (_v0, stageTiles) {
+        return function () {
+            switch (_v0.ctor) {
+                case "_Tuple2":
+                    return !_U.eq(_v0._0 * _v0._1,
+                        List.length(stageTiles)) ? Graphics.Collage.toForm(Text.leftAligned(Text.toText("no data"))) : Graphics.Collage.toForm(Text.centered(Text.toText("ok data")));
+            }
+            _E.Case($moduleName,
+                "between lines 40 and 41");
+        }();
+    });
+    var getImage = F2(function (chara, _v4) {
+        return function () {
+            switch (_v4.ctor) {
+                case "_Tuple2":
+                    return A3(Graphics.Element.image,
+                        _v4._0,
+                        _v4._1,
+                        List.concat(_L.fromArray([MMMarioConfig.imageBaseUrl
+                            , chara.imageBaseName
+                            , "-"
+                            , chara.imagePoseName
+                            , "-"
+                            , chara.imageDireName
+                            , ".png"])));
+            }
+            _E.Case($moduleName,
+                "on line 10, column 3 to 116");
+        }();
+    });
+    var render = F2(function (_v8, gameState) {
+        return function () {
+            switch (_v8.ctor) {
+                case "_Tuple2":
+                    return function () {
+                        var moveToY = Basics.toFloat(((0 - _v8._1) / 2 | 0) + 100);
+                        var moveToX = Basics.toFloat((0 - _v8._0) / 2 | 0);
+                        var stageForm = A2(renderStage,
+                            {ctor: "_Tuple2", _0: 0, _1: 0},
+                            _L.fromArray([]));
+                        var bgForm = Graphics.Collage.filled(MMMarioConfig.bgColor)(A2(Graphics.Collage.rect,
+                            Basics.toFloat(_v8._0),
+                            Basics.toFloat(_v8._1)));
+                        var screenTileHeight = _v8._1 / MMMarioConfig.tileHeight | 0;
+                        var screenTileWidth = _v8._0 / MMMarioConfig.tileWidth | 0;
+                        var lastGameState = _U.replace([
+                                ["screenTileWidth"
+                                    , screenTileWidth]
+                                ,
+                                ["screenTileHeight"
+                                    , screenTileHeight]
+                            ],
+                            gameState);
+                        var marioImage = A2(getImage,
+                            lastGameState.mario,
+                            {ctor: "_Tuple2", _0: 20, _1: 35});
+                        var marioForm = Graphics.Collage.move(lastGameState.mario.pos)(Graphics.Collage.toForm(marioImage));
+                        var stageWholeForm = Graphics.Collage.move({ctor: "_Tuple2", _0: moveToX, _1: moveToY})(Graphics.Collage.group(_L.fromArray([stageForm
+                            , marioForm])));
+                        return A3(Graphics.Collage.collage,
+                            _v8._0,
+                            _v8._1,
+                            _L.fromArray([bgForm
+                                , stageWholeForm]));
+                    }();
+            }
+            _E.Case($moduleName,
+                "between lines 15 and 36");
+        }();
+    });
+    _elm.MMMarioRenderer.values = {_op: _op, getImage: getImage, render: render, renderStage: renderStage};
     return _elm.MMMarioRenderer.values;
+};
+Elm.MMMarioConfig = Elm.MMMarioConfig || {};
+Elm.MMMarioConfig.make = function (_elm) {
+    "use strict";
+    _elm.MMMarioConfig = _elm.MMMarioConfig || {};
+    if (_elm.MMMarioConfig.values)
+        return _elm.MMMarioConfig.values;
+    var _N = Elm.Native,
+        _U = _N.Utils.make(_elm),
+        _L = _N.List.make(_elm),
+        _A = _N.Array.make(_elm),
+        _E = _N.Error.make(_elm),
+        $moduleName = "MMMarioConfig";
+    var Basics = Elm.Basics.make(_elm);
+    var Color = Elm.Color.make(_elm);
+    var Graphics = Graphics || {};
+    Graphics.Collage = Elm.Graphics.Collage.make(_elm);
+    var Graphics = Graphics || {};
+    Graphics.Element = Elm.Graphics.Element.make(_elm);
+    var List = Elm.List.make(_elm);
+    var MMMarioVector = Elm.MMMarioVector.make(_elm);
+    var Maybe = Elm.Maybe.make(_elm);
+    var Native = Native || {};
+    Native.Json = Elm.Native.Json.make(_elm);
+    var Native = Native || {};
+    Native.Ports = Elm.Native.Ports.make(_elm);
+    var Signal = Elm.Signal.make(_elm);
+    var String = Elm.String.make(_elm);
+    var Text = Elm.Text.make(_elm);
+    var Time = Elm.Time.make(_elm);
+    var _op = {};
+    var moveCoeff = 2000;
+    var fricCoeff = 2;
+    var gravityAccel = {ctor: "_Tuple2", _0: 0, _1: -900};
+    var marioJumpAccel = {ctor: "_Tuple2", _0: 0, _1: 2000};
+    var defaultChara = {_: {}, acc: MMMarioVector.zero, imageBaseName: "", imageDireName: "", imagePoseName: "", isTouchOnDownBlock: false, isTouchOnGround: false, isTouchOnLeftBlock: false, isTouchOnRightBlock: false, isTouchOnTopBlock: false, mass: 100, pos: MMMarioVector.zero, spd: MMMarioVector.zero};
+    var initialGameState = {_: {}, mario: _U.replace([
+            ["pos"
+                , {ctor: "_Tuple2", _0: 0, _1: 100}]
+            ,
+            ["isTouchOnGround", false]
+            ,
+            ["imageBaseName", "mario"]
+            ,
+            ["imagePoseName", "stand"]
+            ,
+            ["imageDireName", "right"]
+        ],
+        defaultChara), otherCharas: _L.fromArray([]), screenTileHeight: 10, screenTileWidth: 10, sendData: "", stageTileHeight: 100, stageTileWidth: 200, stageTiles: _L.fromArray([])};
+    var minSpd = {ctor: "_Tuple2", _0: -10, _1: -10};
+    var maxSpd = {ctor: "_Tuple2", _0: 10, _1: 10};
+    var minPos = {ctor: "_Tuple2", _0: 0, _1: 0};
+    var maxPos = {ctor: "_Tuple2", _0: 10000, _1: 10000};
+    var resourceBaseUrl = "resources/";
+    var imageBaseUrl = _L.append(resourceBaseUrl,
+        "images/");
+    var tileHeight = 32;
+    var tileWidth = 32;
+    var requestFps = 0.2;
+    var gameFps = 60;
+    var bgColor = A3(Color.rgb,
+        160,
+        216,
+        239);
+    _elm.MMMarioConfig.values = {_op: _op, bgColor: bgColor, gameFps: gameFps, requestFps: requestFps, tileWidth: tileWidth, tileHeight: tileHeight, resourceBaseUrl: resourceBaseUrl, imageBaseUrl: imageBaseUrl, maxPos: maxPos, minPos: minPos, maxSpd: maxSpd, minSpd: minSpd, defaultChara: defaultChara, initialGameState: initialGameState, marioJumpAccel: marioJumpAccel, gravityAccel: gravityAccel, fricCoeff: fricCoeff, moveCoeff: moveCoeff};
+    return _elm.MMMarioConfig.values;
 };
 Elm.MMMarioType = Elm.MMMarioType || {};
 Elm.MMMarioType.make = function (_elm) {
@@ -346,8 +403,8 @@ Elm.MMMarioType.make = function (_elm) {
     var Text = Elm.Text.make(_elm);
     var Time = Elm.Time.make(_elm);
     var _op = {};
-    var GameState = F7(function (a, b, c, d, e, f, g) {
-        return {_: {}, mario: a, otherCharas: f, screenTileHeight: e, screenTileWidth: d, sendData: g, stageTileHeight: c, stageTileWidth: b};
+    var GameState = F8(function (a, b, c, d, e, f, g, h) {
+        return {_: {}, mario: a, otherCharas: g, screenTileHeight: f, screenTileWidth: e, sendData: h, stageTileHeight: c, stageTileWidth: b, stageTiles: d};
     });
     var Chara = function (a) {
         return function (b) {
@@ -377,7 +434,12 @@ Elm.MMMarioType.make = function (_elm) {
     var UserInput = F2(function (a, b) {
         return {_: {}, arr: a, space: b};
     });
-    _elm.MMMarioType.values = {_op: _op, UserInput: UserInput, Chara: Chara, GameState: GameState};
+    var Ground = {ctor: "Ground"};
+    var Cloud = {ctor: "Cloud"};
+    var RItem = {ctor: "RItem"};
+    var RBlock = {ctor: "RBlock"};
+    var RChara = {ctor: "RChara"};
+    _elm.MMMarioType.values = {_op: _op, RChara: RChara, RBlock: RBlock, RItem: RItem, Cloud: Cloud, Ground: Ground, UserInput: UserInput, Chara: Chara, GameState: GameState};
     return _elm.MMMarioType.values;
 };
 Elm.MMMarioUtil = Elm.MMMarioUtil || {};
@@ -412,6 +474,25 @@ Elm.MMMarioUtil.make = function (_elm) {
     var absRound = function ($) {
         return Basics.round(Basics.abs($));
     };
+    var takeCycleAsList$ = F3(function (n, l, accum) {
+        return function () {
+            var notEnough = _U.cmp(List.length(l),
+                n) < 0;
+            return notEnough ? accum : A3(takeCycleAsList$,
+                n,
+                A2(List.drop, n, l),
+                _L.append(accum,
+                    _L.fromArray([A2(List.take,
+                        n,
+                        l)])));
+        }();
+    });
+    var takeCycleAsList = F2(function (n, l) {
+        return A3(takeCycleAsList$,
+            n,
+            l,
+            _L.fromArray([]));
+    });
     var list2tuple = function (l) {
         return {ctor: "_Tuple2", _0: List.head(l), _1: List.last(l)};
     };
@@ -434,7 +515,7 @@ Elm.MMMarioUtil.make = function (_elm) {
             l,
             _L.fromArray([]));
     });
-    _elm.MMMarioUtil.values = {_op: _op, list2tuple: list2tuple, takeCycle: takeCycle, takeCycle$: takeCycle$, absRound: absRound};
+    _elm.MMMarioUtil.values = {_op: _op, list2tuple: list2tuple, takeCycle: takeCycle, takeCycle$: takeCycle$, takeCycleAsList: takeCycleAsList, takeCycleAsList$: takeCycleAsList$, absRound: absRound};
     return _elm.MMMarioUtil.values;
 };
 Elm.MMMarioVector = Elm.MMMarioVector || {};
