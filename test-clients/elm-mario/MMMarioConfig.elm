@@ -47,11 +47,11 @@ maxSpd = (10, 10)
 minSpd = (-10, -10)
 
 -- 標準のキャラクター
+defaultChara : Chara
 defaultChara = {
                  pos = zero
                , spd = zero
                , acc = zero
-               , isTouchOnGround = False
                , isTouchOnTopBlock = False
                , isTouchOnLeftBlock = False
                , isTouchOnDownBlock = False
@@ -63,9 +63,9 @@ defaultChara = {
                }
 
 -- ゲームの初期状態
+initialGameState : GameState
 initialGameState = {
                      mario = { defaultChara | pos <- (0, 100)
-                                            , isTouchOnGround <- False
                                             , imageBaseName <- "mario"
                                             , imagePoseName <- "stand"
                                             , imageDireName <- "right"

@@ -19,7 +19,6 @@ type Chara = {
              , isTouchOnLeftBlock : Bool
              , isTouchOnDownBlock : Bool
              , isTouchOnRightBlock : Bool
-             , isTouchOnGround : Bool
              , mass : Float
              , imageBaseName : String
              , imagePoseName : String

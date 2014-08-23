@@ -1,5 +1,7 @@
 module MMMarioUtil where
 
+import MMMarioConfig (..)
+
 -- リストをタプルに。
 -- ex: [1, 2] -> (1, 2)
 list2tuple l = (head l, last l)
@@ -20,3 +22,9 @@ takeCycleAsList' n l accum =
 
 -- round関数とabs関数を一度に
 absRound = round . abs
+
+-- タイルのX座標を求める
+getTileXCoord pos =
+    pos `div` tileWidth
+getTileYCoord pos =
+    pos `div` tileHeight

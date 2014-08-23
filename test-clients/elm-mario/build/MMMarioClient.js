@@ -69,7 +69,7 @@ Elm.MMMarioClient.make = function (_elm) {
                     ["spd"
                         , {ctor: "_Tuple2", _0: sx, _1: 0}]
                     ,
-                    ["isTouchOnGround", true]
+                    ["isTouchOnDownBlock", true]
                 ],
                 m) : _U.replace([
                     ["pos"
@@ -86,12 +86,12 @@ Elm.MMMarioClient.make = function (_elm) {
     });
     var calcCharaAccel = F6(function (delta, moveAccel, fricAccel, gravityAccel, willJump, m) {
         return function () {
-            var jumpable = willJump && m.isTouchOnGround;
+            var jumpable = willJump && m.isTouchOnDownBlock;
             return jumpable ? _U.replace([
                     ["acc"
                         , MMMarioConfig.marioJumpAccel]
                 ],
-                m) : Basics.not(m.isTouchOnGround) ? _U.replace([
+                m) : Basics.not(m.isTouchOnDownBlock) ? _U.replace([
                     ["acc"
                         , A2(MMMarioVector.addVec,
                         fricAccel,
@@ -147,7 +147,7 @@ Elm.MMMarioClient.make = function (_elm) {
                     }();
             }
             _E.Case($moduleName,
-                "between lines 102 and 128");
+                "between lines 103 and 129");
         }();
     });
     var sendData = function (gameState) {
@@ -377,7 +377,7 @@ Elm.MMMarioConfig.make = function (_elm) {
     var fricCoeff = 10;
     var gravityAccel = {ctor: "_Tuple2", _0: 0, _1: -900};
     var marioJumpAccel = {ctor: "_Tuple2", _0: 0, _1: 2000};
-    var defaultChara = {_: {}, acc: MMMarioVector.zero, imageBaseName: "", imageDireName: "", imagePoseName: "", isTouchOnDownBlock: false, isTouchOnGround: false, isTouchOnLeftBlock: false, isTouchOnRightBlock: false, isTouchOnTopBlock: false, mass: 100, pos: MMMarioVector.zero, spd: MMMarioVector.zero};
+    var defaultChara = {_: {}, acc: MMMarioVector.zero, imageBaseName: "", imageDireName: "", imagePoseName: "", isTouchOnDownBlock: false, isTouchOnLeftBlock: false, isTouchOnRightBlock: false, isTouchOnTopBlock: false, mass: 100, pos: MMMarioVector.zero, spd: MMMarioVector.zero};
     var minSpd = {ctor: "_Tuple2", _0: -10, _1: -10};
     var maxSpd = {ctor: "_Tuple2", _0: 10, _1: 10};
     var minPos = {ctor: "_Tuple2", _0: 0, _1: 0};
@@ -408,8 +408,6 @@ Elm.MMMarioConfig.make = function (_elm) {
     var initialGameState = {_: {}, mario: _U.replace([
             ["pos"
                 , {ctor: "_Tuple2", _0: 0, _1: 100}]
-            ,
-            ["isTouchOnGround", false]
             ,
             ["imageBaseName", "mario"]
             ,
@@ -465,9 +463,7 @@ Elm.MMMarioType.make = function (_elm) {
                                     return function (i) {
                                         return function (j) {
                                             return function (k) {
-                                                return function (l) {
-                                                    return {_: {}, acc: c, imageBaseName: j, imageDireName: l, imagePoseName: k, isTouchOnDownBlock: f, isTouchOnGround: h, isTouchOnLeftBlock: e, isTouchOnRightBlock: g, isTouchOnTopBlock: d, mass: i, pos: a, spd: b};
-                                                };
+                                                return {_: {}, acc: c, imageBaseName: i, imageDireName: k, imagePoseName: j, isTouchOnDownBlock: f, isTouchOnLeftBlock: e, isTouchOnRightBlock: g, isTouchOnTopBlock: d, mass: h, pos: a, spd: b};
                                             };
                                         };
                                     };

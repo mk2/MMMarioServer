@@ -3,6 +3,7 @@ module MMMarioClient where
 {--
 @author mk2
 @description
+
  --}
 
 import Graphics.Input (Input, input, button)
@@ -67,14 +68,14 @@ port wsSendData = let sendData = (\gameState -> gameState.sendData)
 calcCharaAccel delta moveAccel fricAccel gravityAccel willJump m =
   let
       -- ジャンプできるかどうか
-      jumpable = willJump && m.isTouchOnGround
+      jumpable = willJump && m.isTouchOnDownBlock
 
   in if
           -- ジャンプキーが押されてかつ地面に触れていた場合ジャンプ可能
         | jumpable -> { m | acc <- marioJumpAccel }
 
           -- 地面に触れていない場合、移動できない
-        | not m.isTouchOnGround -> { m | acc <- addVec fricAccel gravityAccel }
+        | not m.isTouchOnDownBlock -> { m | acc <- addVec fricAccel gravityAccel }
 
           -- それ以外の場合（全ての加速度が現在の加速度にたされる）
         | otherwise -> { m | acc <- addVec moveAccel . addVec fricAccel <| gravityAccel }
@@ -87,7 +88,7 @@ calcCharaPos delta m =
       (nx, ny) = addVec m.pos (sx, sy)
   in if | ny < 0 -> { m | pos <- clampVec minPos maxPos (nx, 0)
                         , spd <- (sx, 0)
-                        , isTouchOnGround <- True }
+                        , isTouchOnDownBlock <- True }
         | otherwise -> { m | pos <- clampVec minPos maxPos (nx, ny)
                            , spd <- (sx, sy) }
 
