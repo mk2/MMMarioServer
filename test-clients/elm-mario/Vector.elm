@@ -17,8 +17,8 @@ subVec (x, y) (mx, my) =
   (x - mx, y - my)
 
 -- ベクトルに係数をかける
-multVec : Vec -> Float -> Vec
-multVec (x, y) k =
+multVec : Float -> Vec -> Vec
+multVec k (x, y) =
   (x * k, y * k)
 
 -- ベクトルの内積

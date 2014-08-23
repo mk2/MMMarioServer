@@ -22,16 +22,20 @@ gameFps = 60
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
-requestFps = 30
+requestFps = 0.2
 
 -- リソースへのアクセスパス
 resourceBaseUrl = "resources/"
 
--- 画像へのアクセスパス
 imageBaseUrl = resourceBaseUrl ++ "images/"
 
-maxPos = (1000, 1000)
+-- 最大位置
+maxPos = (10000, 10000)
 minPos = (0, 0)
+
+-- 最大速度
+maxSpd = (10, 10)
+minSpd = (-10, -10)
 
 -- 標準のキャラクター
 defaultChara = {
@@ -39,7 +43,10 @@ defaultChara = {
                , spd = zero
                , acc = zero
                , isTouchOnGround = False
-               , isTouchOnBlock = False
+               , isTouchOnTopBlock = False
+               , isTouchOnLeftBlock = False
+               , isTouchOnDownBlock = False
+               , isTouchOnRightBlock = False
                , mass = 100
                , imageBaseName = ""
                , imagePoseName = ""
@@ -49,6 +56,7 @@ defaultChara = {
 -- ゲームの初期状態
 initialGameState = {
                      mario = { defaultChara | pos <- (0, 100)
+                                            , isTouchOnGround <- False
                                             , imageBaseName <- "mario"
                                             , imagePoseName <- "stand"
                                             , imageDireName <- "right"
@@ -62,16 +70,16 @@ initialGameState = {
                    }
 
 -- マリオのジャンプ加速度
-marioJumpAccel = (0, 10000)
+marioJumpAccel = (0, 2000)
 
 -- 重力加速度
-gravityAccel = (0, -10000)
+gravityAccel = (0, -900)
 
 -- 摩擦係数
-fricCoeff = 500
+fricCoeff = 2
 
 -- マリオ移動加速度係数
-moveCoeff = 200000
+moveCoeff = 2000
 
 -- タイルの幅(px)
 tileWidth = 32
@@ -89,7 +97,10 @@ type Chara = {
                pos : Vec
              , spd : Vec
              , acc : Vec
-             , isTouchOnBlock : Bool
+             , isTouchOnTopBlock : Bool
+             , isTouchOnLeftBlock : Bool
+             , isTouchOnDownBlock : Bool
+             , isTouchOnRightBlock : Bool
              , isTouchOnGround : Bool
              , mass : Float
              , imageBaseName : String
@@ -121,42 +132,30 @@ type UserInput = {
 -- willJump : ジャンプ状態に持っていくかどうか
 calcCharaAccel delta moveAccel fricAccel gravityAccel willJump m =
   let
-      -- キャラクターのx,y座標
-      x = getx m.pos
-      y = gety m.pos
-
-      -- 各加速度はdelta秒分の量にする
-      dGravityAccel = multVec gravityAccel delta
-      dMoveAccel = log "dMoveAccel" <| multVec moveAccel delta
-      dFricAccel = multVec fricAccel delta
-      dSmallFricAccel = multVec dFricAccel 0.2
-
       -- ジャンプできるかどうか
       jumpable = willJump && m.isTouchOnGround
 
-  in if | jumpable -> { m | acc <- addVec m.acc marioJumpAccel } -- ジャンプキーが押されてかつ地面に触れていた場合ジャンプ可能
-        | not m.isTouchOnGround -> { m | acc <- addVec m.acc
-                                             <| addVec dSmallFricAccel dGravityAccel } -- 地面に触れていない場合、移動できない
-        | otherwise -> { m | acc <- log "accel" <| addVec m.acc
-                                 <| addVec dGravityAccel
-                                 <| addVec dMoveAccel dFricAccel } -- それ以外の場合（全ての加速度が現在の加速度にたされる）
+  in if
+          -- ジャンプキーが押されてかつ地面に触れていた場合ジャンプ可能
+        | jumpable -> { m | acc <- marioJumpAccel }
+
+          -- 地面に触れていない場合、移動できない
+        | not m.isTouchOnGround -> { m | acc <- addVec fricAccel gravityAccel }
+
+          -- それ以外の場合（全ての加速度が現在の加速度にたされる）
+        | otherwise -> { m | acc <- addVec moveAccel . addVec fricAccel <| gravityAccel }
 
 -- キャラクターの位置を計算
+-- mにある加速度で位置を計算し、その位置が適切なものならばそれに更新、違っているならそのまま
 calcCharaPos delta m =
-  let x = getx m.pos
-      y = gety m.pos
-      ax = log "accelx" <| getx m.acc
-      ay = log "accely" <| gety m.acc
-      sx = ax * delta
-      sy = ay * delta
-  in if | m.isTouchOnBlock -> { m | acc <- zero, spd <- zero
-                                  , isTouchOnGround <- True }
-        | y < 0 -> { m | acc <- (ax, 0)
-                       , pos <- clampVec minPos maxPos (x, 0)
-                       , isTouchOnGround <- True }
-        | otherwise -> { m | pos <- clampVec minPos maxPos <| addVec m.pos <| multVec m.spd delta
-                           , spd <- (sx, sy)
-                           , isTouchOnGround <- False }
+  let
+      (sx, sy) = clampVec minSpd maxSpd . addVec m.spd . multVec delta <| m.acc
+      (nx, ny) = addVec m.pos (sx, sy)
+  in if | ny < 0 -> { m | pos <- clampVec minPos maxPos (nx, 0)
+                        , spd <- (sx, 0)
+                        , isTouchOnGround <- True }
+        | otherwise -> { m | pos <- clampVec minPos maxPos (nx, ny)
+                           , spd <- (sx, sy) }
 
 -- キャラクターのイメージを更新
 updateCharaImage m =
@@ -186,19 +185,19 @@ stepGame (delta, arr, space, recvData) gameState =
       preMario = gameState.mario
 
       -- 移動加速度
-      moveAccel = log "moveAccel" <| multVec (toFloat arr.x, toFloat arr.y) moveCoeff
+      moveAccel = multVec moveCoeff (toFloat arr.x, 0)
 
       -- 摩擦加速度
-      fricAccel = multVec (revVec preMario.spd) fricCoeff
+      fricAccel = multVec fricCoeff (revVec preMario.spd)
 
       -- 更新関数
       updateChara = updateCharaImage . calcCharaPos delta . calcCharaAccel delta moveAccel fricAccel gravityAccel space
 
       -- マリオを更新する
-      newMario = updateChara <| preMario
+      newMario = updateChara preMario
 
       absRound = round . abs
-      -- 送信するマリオのいち情報
+      -- 送信するマリオの位置情報
       marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
 
       -- 別キャラの位置

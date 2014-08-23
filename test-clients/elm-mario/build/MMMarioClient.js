@@ -93,39 +93,56 @@ Elm.MMMarioClient.make = function (_elm) {
              ,stageTileHeight: c
              ,stageTileWidth: b};
    });
-   var Chara = F9(function (a,
-   b,
-   c,
-   d,
-   e,
-   f,
-   g,
-   h,
-   i) {
-      return {_: {}
-             ,acc: c
-             ,imageBaseName: g
-             ,imageDireName: i
-             ,imagePoseName: h
-             ,isTouchOnBlock: d
-             ,isTouchOnGround: e
-             ,mass: f
-             ,pos: a
-             ,spd: b};
-   });
+   var Chara = function (a) {
+      return function (b) {
+         return function (c) {
+            return function (d) {
+               return function (e) {
+                  return function (f) {
+                     return function (g) {
+                        return function (h) {
+                           return function (i) {
+                              return function (j) {
+                                 return function (k) {
+                                    return function (l) {
+                                       return {_: {}
+                                              ,acc: c
+                                              ,imageBaseName: j
+                                              ,imageDireName: l
+                                              ,imagePoseName: k
+                                              ,isTouchOnDownBlock: f
+                                              ,isTouchOnGround: h
+                                              ,isTouchOnLeftBlock: e
+                                              ,isTouchOnRightBlock: g
+                                              ,isTouchOnTopBlock: d
+                                              ,mass: i
+                                              ,pos: a
+                                              ,spd: b};
+                                    };
+                                 };
+                              };
+                           };
+                        };
+                     };
+                  };
+               };
+            };
+         };
+      };
+   };
    var RItem = {ctor: "RItem"};
    var RBlock = {ctor: "RBlock"};
    var RChara = {ctor: "RChara"};
    var tileHeight = 32;
    var tileWidth = 32;
-   var moveCoeff = 200000;
-   var fricCoeff = 500;
+   var moveCoeff = 2000;
+   var fricCoeff = 2;
    var gravityAccel = {ctor: "_Tuple2"
                       ,_0: 0
-                      ,_1: -10000};
+                      ,_1: -900};
    var marioJumpAccel = {ctor: "_Tuple2"
                         ,_0: 0
-                        ,_1: 10000};
+                        ,_1: 2000};
    var calcCharaAccel = F6(function (delta,
    moveAccel,
    fricAccel,
@@ -134,32 +151,14 @@ Elm.MMMarioClient.make = function (_elm) {
    m) {
       return function () {
          var jumpable = willJump && m.isTouchOnGround;
-         var dFricAccel = A2(Vector.multVec,
-         fricAccel,
-         delta);
-         var dSmallFricAccel = A2(Vector.multVec,
-         dFricAccel,
-         0.2);
-         var dMoveAccel = Debug.log("dMoveAccel")(A2(Vector.multVec,
-         moveAccel,
-         delta));
-         var dGravityAccel = A2(Vector.multVec,
-         gravityAccel,
-         delta);
-         var y = Vector.gety(m.pos);
-         var x = Vector.getx(m.pos);
          return jumpable ? _U.replace([["acc"
-                                       ,A2(Vector.addVec,
-                                       m.acc,
-                                       marioJumpAccel)]],
+                                       ,marioJumpAccel]],
          m) : Basics.not(m.isTouchOnGround) ? _U.replace([["acc"
-                                                          ,Vector.addVec(m.acc)(A2(Vector.addVec,
-                                                          dSmallFricAccel,
-                                                          dGravityAccel))]],
+                                                          ,A2(Vector.addVec,
+                                                          fricAccel,
+                                                          gravityAccel)]],
          m) : _U.replace([["acc"
-                          ,Debug.log("accel")(Vector.addVec(m.acc)(Vector.addVec(dGravityAccel)(A2(Vector.addVec,
-                          dMoveAccel,
-                          dFricAccel))))]],
+                          ,Vector.addVec(moveAccel)(Vector.addVec(fricAccel)(gravityAccel))]],
          m);
       }();
    });
@@ -168,8 +167,11 @@ Elm.MMMarioClient.make = function (_elm) {
                       ,imageBaseName: ""
                       ,imageDireName: ""
                       ,imagePoseName: ""
-                      ,isTouchOnBlock: false
+                      ,isTouchOnDownBlock: false
                       ,isTouchOnGround: false
+                      ,isTouchOnLeftBlock: false
+                      ,isTouchOnRightBlock: false
+                      ,isTouchOnTopBlock: false
                       ,mass: 100
                       ,pos: Vector.zero
                       ,spd: Vector.zero};
@@ -178,6 +180,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                               ,{ctor: "_Tuple2"
                                                ,_0: 0
                                                ,_1: 100}]
+                                             ,["isTouchOnGround",false]
                                              ,["imageBaseName","mario"]
                                              ,["imagePoseName","stand"]
                                              ,["imageDireName","right"]],
@@ -188,45 +191,53 @@ Elm.MMMarioClient.make = function (_elm) {
                           ,sendData: ""
                           ,stageTileHeight: 100
                           ,stageTileWidth: 200};
+   var minSpd = {ctor: "_Tuple2"
+                ,_0: -10
+                ,_1: -10};
+   var maxSpd = {ctor: "_Tuple2"
+                ,_0: 10
+                ,_1: 10};
    var minPos = {ctor: "_Tuple2"
                 ,_0: 0
                 ,_1: 0};
    var maxPos = {ctor: "_Tuple2"
-                ,_0: 1000
-                ,_1: 1000};
+                ,_0: 10000
+                ,_1: 10000};
    var calcCharaPos = F2(function (delta,
    m) {
       return function () {
-         var ay = Debug.log("accely")(Vector.gety(m.acc));
-         var sy = ay * delta;
-         var ax = Debug.log("accelx")(Vector.getx(m.acc));
-         var sx = ax * delta;
-         var y = Vector.gety(m.pos);
-         var x = Vector.getx(m.pos);
-         return m.isTouchOnBlock ? _U.replace([["acc"
-                                               ,Vector.zero]
-                                              ,["spd",Vector.zero]
-                                              ,["isTouchOnGround",true]],
-         m) : _U.cmp(y,
-         0) < 0 ? _U.replace([["acc"
-                              ,{ctor: "_Tuple2",_0: ax,_1: 0}]
-                             ,["pos"
+         var $ = A2(Vector.clampVec,
+         minSpd,
+         maxSpd)(Vector.addVec(m.spd)(Vector.multVec(delta)(m.acc))),
+         sx = $._0,
+         sy = $._1;
+         var $ = A2(Vector.addVec,
+         m.pos,
+         {ctor: "_Tuple2"
+         ,_0: sx
+         ,_1: sy}),
+         nx = $._0,
+         ny = $._1;
+         return _U.cmp(ny,
+         0) < 0 ? _U.replace([["pos"
                               ,A3(Vector.clampVec,
                               minPos,
                               maxPos,
-                              {ctor: "_Tuple2",_0: x,_1: 0})]
+                              {ctor: "_Tuple2",_0: nx,_1: 0})]
+                             ,["spd"
+                              ,{ctor: "_Tuple2",_0: sx,_1: 0}]
                              ,["isTouchOnGround",true]],
          m) : _U.replace([["pos"
-                          ,A2(Vector.clampVec,
+                          ,A3(Vector.clampVec,
                           minPos,
-                          maxPos)(Vector.addVec(m.pos)(A2(Vector.multVec,
-                          m.spd,
-                          delta)))]
+                          maxPos,
+                          {ctor: "_Tuple2"
+                          ,_0: nx
+                          ,_1: ny})]
                          ,["spd"
                           ,{ctor: "_Tuple2"
                            ,_0: sx
-                           ,_1: sy}]
-                         ,["isTouchOnGround",false]],
+                           ,_1: sy}]],
          m);
       }();
    });
@@ -247,15 +258,15 @@ Elm.MMMarioClient.make = function (_elm) {
                  var absRound = function ($) {
                     return Basics.round(Basics.abs($));
                  };
-                 var moveAccel = Debug.log("moveAccel")(A2(Vector.multVec,
+                 var moveAccel = A2(Vector.multVec,
+                 moveCoeff,
                  {ctor: "_Tuple2"
                  ,_0: Basics.toFloat(_v0._1.x)
-                 ,_1: Basics.toFloat(_v0._1.y)},
-                 moveCoeff));
+                 ,_1: 0});
                  var preMario = gameState.mario;
                  var fricAccel = A2(Vector.multVec,
-                 Vector.revVec(preMario.spd),
-                 fricCoeff);
+                 fricCoeff,
+                 Vector.revVec(preMario.spd));
                  var updateChara = function ($) {
                     return updateCharaImage(calcCharaPos(_v0._0)(A5(calcCharaAccel,
                     _v0._0,
@@ -275,7 +286,7 @@ Elm.MMMarioClient.make = function (_elm) {
                  gameState);
               }();}
          _E.Case($moduleName,
-         "between lines 184 and 211");
+         "between lines 183 and 210");
       }();
    });
    var resourceBaseUrl = "resources/";
@@ -297,7 +308,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                        ,chara.imageDireName
                                        ,".png"])));}
          _E.Case($moduleName,
-         "on line 167, column 3 to 116");
+         "on line 166, column 3 to 116");
       }();
    });
    var display = F2(function (_v10,
@@ -331,10 +342,10 @@ Elm.MMMarioClient.make = function (_elm) {
                  _L.fromArray([Graphics.Collage.move(marioPos)(Graphics.Collage.toForm(marioImage))]));
               }();}
          _E.Case($moduleName,
-         "between lines 244 and 258");
+         "between lines 243 and 257");
       }();
    });
-   var requestFps = 30;
+   var requestFps = 0.2;
    var gameFps = 60;
    var inputSignal = function () {
       var delta = A2(Signal._op["<~"],
@@ -390,6 +401,8 @@ Elm.MMMarioClient.make = function (_elm) {
                                ,imageBaseUrl: imageBaseUrl
                                ,maxPos: maxPos
                                ,minPos: minPos
+                               ,maxSpd: maxSpd
+                               ,minSpd: minSpd
                                ,defaultChara: defaultChara
                                ,initialGameState: initialGameState
                                ,marioJumpAccel: marioJumpAccel
@@ -500,8 +513,8 @@ Elm.Vector.make = function (_elm) {
          "on line 27, column 3 to 18");
       }();
    });
-   var multVec = F2(function (_v12,
-   k) {
+   var multVec = F2(function (k,
+   _v12) {
       return function () {
          switch (_v12.ctor)
          {case "_Tuple2":
