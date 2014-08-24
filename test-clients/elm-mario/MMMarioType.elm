@@ -32,6 +32,7 @@ type GameState = {
                  , stageTiles : [[StageTile]]
                  , screenTileWidth : Float
                  , screenTileHeight : Float
-                 , otherCharas : [(Int, (Float, Float))]
+                 , otherCharas : [(Int, (String, Vec))]
                  , sendData : String
+                 , clientName : String
                  }

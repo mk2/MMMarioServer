@@ -107,7 +107,7 @@ Elm.MMMarioClient.make = function (_elm) {
     var stepGame = F2(function (_v0, gameState) {
         return function () {
             switch (_v0.ctor) {
-                case "_Tuple4":
+                case "_Tuple5":
                     return function () {
                         var maybeFloat = function ($) {
                             return A2(Maybe.maybe,
@@ -116,14 +116,26 @@ Elm.MMMarioClient.make = function (_elm) {
                                     return n;
                                 })(String.toFloat($));
                         };
-                        var cnvToFloat = function (_v6) {
+                        var cnvToFloat = function (_v7) {
                             return function () {
-                                switch (_v6.ctor) {
-                                    case "_Tuple2":
-                                        return {ctor: "_Tuple2", _0: maybeFloat(_v6._0), _1: maybeFloat(_v6._1)};
+                                switch (_v7.ctor) {
+                                    case "::":
+                                        switch (_v7._1.ctor) {
+                                            case "::":
+                                                switch (_v7._1._1.ctor) {
+                                                    case "::":
+                                                        switch (_v7._1._1._1.ctor) {
+                                                            case "[]":
+                                                                return {ctor: "_Tuple2", _0: _v7._0, _1: {ctor: "_Tuple2", _0: maybeFloat(_v7._1._0), _1: maybeFloat(_v7._1._1._0)}};
+                                                        }
+                                                        break;
+                                                }
+                                                break;
+                                        }
+                                        break;
                                 }
                                 _E.Case($moduleName,
-                                    "on line 127, column 38 to 70");
+                                    "on line 132, column 44 to 84");
                             }();
                         };
                         var poss = A2(String.split,
@@ -131,8 +143,8 @@ Elm.MMMarioClient.make = function (_elm) {
                             _v0._3);
                         var numCharas = List.length(poss) / 2 | 0;
                         var otherCharas = Debug.log("otherCharas")(List.zip(_L.range(1,
-                            numCharas))(List.map(cnvToFloat)(A2(MMMarioUtil.takeCycle,
-                            2,
+                            numCharas))(List.map(cnvToFloat)(A2(MMMarioUtil.takeCycleAsList,
+                            3,
                             poss))));
                         var moveAccel = A2(MMMarioVector.multVec,
                             MMMarioConfig.moveCoeff,
@@ -161,17 +173,23 @@ Elm.MMMarioClient.make = function (_elm) {
                                 ["sendData", marioPosStr]
                                 ,
                                 ["otherCharas", otherCharas]
+                                ,
+                                ["clientName", _v0._4]
                             ],
                             gameState);
                     }();
             }
             _E.Case($moduleName,
-                "between lines 104 and 132");
+                "between lines 109 and 138");
         }();
     });
     var sendData = function (gameState) {
         return gameState.sendData;
     };
+    var clientName = Native.Ports.portIn("clientName",
+        Native.Ports.incomingSignal(function (v) {
+            return typeof v === "string" || typeof v === "object" && v instanceof String ? v : _E.raise("invalid input, expecting JSString but got " + v);
+        }));
     var wsRecvData = Native.Ports.portIn("wsRecvData",
         Native.Ports.incomingSignal(function (v) {
             return typeof v === "string" || typeof v === "object" && v instanceof String ? v : _E.raise("invalid input, expecting JSString but got " + v);
@@ -183,14 +201,16 @@ Elm.MMMarioClient.make = function (_elm) {
         var keySignal = A2(Signal._op["~"],
             A2(Signal._op["~"],
                 A2(Signal._op["~"],
-                    A2(Signal._op["<~"],
-                        F4(function (v0, v1, v2, v3) {
-                            return {ctor: "_Tuple4", _0: v0, _1: v1, _2: v2, _3: v3};
-                        }),
-                        delta),
-                    Keyboard.arrows),
-                Keyboard.space),
-            wsRecvData);
+                    A2(Signal._op["~"],
+                        A2(Signal._op["<~"],
+                            F5(function (v0, v1, v2, v3, v4) {
+                                return {ctor: "_Tuple5", _0: v0, _1: v1, _2: v2, _3: v3, _4: v4};
+                            }),
+                            delta),
+                        Keyboard.arrows),
+                    Keyboard.space),
+                wsRecvData),
+            clientName);
         return A2(Signal.sampleOn,
             delta,
             keySignal);
@@ -379,7 +399,7 @@ Elm.MMMarioRenderer.make = function (_elm) {
                         Array.fromList(stageTileRows))));
             }
             _E.Case($moduleName,
-                "on line 44, column 5 to 128");
+                "on line 48, column 5 to 128");
         }();
     });
     var getImage = F2(function (chara, _v5) {
@@ -431,16 +451,36 @@ Elm.MMMarioRenderer.make = function (_elm) {
                             return function () {
                                 switch (_v13.ctor) {
                                     case "_Tuple2":
-                                        return Graphics.Collage.move(_v13._1)(Graphics.Collage.toForm(marioImage));
+                                        switch (_v13._1.ctor) {
+                                            case "_Tuple2":
+                                                return Graphics.Collage.move(_v13._1._1)(Graphics.Collage.toForm(marioImage));
+                                        }
+                                        break;
                                 }
                                 _E.Case($moduleName,
-                                    "on line 31, column 35 to 65");
+                                    "on line 34, column 43 to 73");
                             }();
                         };
-                        var marioForms = Graphics.Collage.group(A2(List.map,
-                            drawMario,
-                            gameState.otherCharas));
                         var marioForm = Graphics.Collage.move(lastGameState.mario.pos)(Graphics.Collage.toForm(marioImage));
+                        var clientName = gameState.clientName;
+                        var filterMario = function (_v19) {
+                            return function () {
+                                switch (_v19.ctor) {
+                                    case "_Tuple2":
+                                        switch (_v19._1.ctor) {
+                                            case "_Tuple2":
+                                                return !_U.eq(_v19._1._0,
+                                                    clientName);
+                                        }
+                                        break;
+                                }
+                                _E.Case($moduleName,
+                                    "on line 35, column 45 to 63");
+                            }();
+                        };
+                        var marioForms = Graphics.Collage.group(List.map(drawMario)(A2(List.filter,
+                            filterMario,
+                            gameState.otherCharas)));
                         var stageWholeForm = Graphics.Collage.move({ctor: "_Tuple2", _0: moveToX, _1: moveToY})(Graphics.Collage.group(_L.fromArray([stageForm
                             , marioForm
                             , marioForms])));
@@ -452,7 +492,7 @@ Elm.MMMarioRenderer.make = function (_elm) {
                     }();
             }
             _E.Case($moduleName,
-                "between lines 16 and 40");
+                "between lines 16 and 44");
         }();
     });
     _elm.MMMarioRenderer.values = {_op: _op, getImage: getImage, render: render, renderStage: renderStage, renderTileRow: renderTileRow, renderTile: renderTile};
@@ -503,7 +543,7 @@ Elm.MMMarioConfig.make = function (_elm) {
         "images/");
     var tileHeight = 64;
     var tileWidth = 64;
-    var requestFps = 1;
+    var requestFps = 5;
     var gameFps = 60;
     var gndColor = A3(Color.rgb,
         188,
@@ -521,7 +561,7 @@ Elm.MMMarioConfig.make = function (_elm) {
             10,
             MMMarioType.Ground)]),
         List.repeat(9)(List.repeat(10)(MMMarioType.None)));
-    var initialGameState = {_: {}, mario: _U.replace([
+    var initialGameState = {_: {}, clientName: "", mario: _U.replace([
             ["pos"
                 , {ctor: "_Tuple2", _0: 0, _1: 100}]
             ,
@@ -565,8 +605,8 @@ Elm.MMMarioType.make = function (_elm) {
     var Text = Elm.Text.make(_elm);
     var Time = Elm.Time.make(_elm);
     var _op = {};
-    var GameState = F8(function (a, b, c, d, e, f, g, h) {
-        return {_: {}, mario: a, otherCharas: g, screenTileHeight: f, screenTileWidth: e, sendData: h, stageTileHeight: c, stageTileWidth: b, stageTiles: d};
+    var GameState = F9(function (a, b, c, d, e, f, g, h, i) {
+        return {_: {}, clientName: i, mario: a, otherCharas: g, screenTileHeight: f, screenTileWidth: e, sendData: h, stageTileHeight: c, stageTileWidth: b, stageTiles: d};
     });
     var Chara = function (a) {
         return function (b) {

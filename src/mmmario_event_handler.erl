@@ -60,11 +60,11 @@ init([]) ->
 
 %% キャラの位置更新イベントを受け取る
 %% 受け取ったら全キャラの位置情報を取得し、一斉にクライアントに投げる。微妙？
-handle_event({update_chara_pos, SenderPPid, {X, Y}}, S) ->
+handle_event({update_chara_pos, SenderPPid, Name, {X, Y}}, S) ->
   % etsに挿入
-  ets:insert(?MODULE, {{chara_pos, SenderPPid}, {X, Y}}),
+  ets:insert(?MODULE, {{chara_pos, SenderPPid}, Name, {X, Y}}),
   % etsからキー {chara_pos, _}の値を拾う
-  CharaPos = ets:match(?MODULE, {{chara_pos, '$1'}, {'$2', '$3'}}),
+  CharaPos = ets:match(?MODULE, {{chara_pos, '_'}, '$1', {'$2', '$3'}}),
   case mmmario_event_helper:pos_list_to_binary(CharaPos) of
     {ok, Str} ->
       [mmmario_wsserv:send(WSServPid, Str) || WSServPid <- mmmario_wsserv_sup:childPids()];

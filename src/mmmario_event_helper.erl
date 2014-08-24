@@ -22,6 +22,13 @@ text_to_event("M" ++ RawText) ->
   io:format("X: ~p Y: ~p~n", [X, Y]),
   {move, {X, Y}};
 
+%% 名前登録、クライアントの名前を登録する
+%% ex: "N1203120"
+text_to_event("n" ++ RawText) ->
+  text_to_event("N" ++ RawText);
+text_to_event("N" ++ RawText) ->
+  {name, RawText};
+
 text_to_event(RawText) ->
   io:format("unknown command contained: ~p~n", [RawText]).
 
@@ -30,7 +37,7 @@ text_to_event(RawText) ->
 pos_list_to_binary(PosList) ->
   case catch lists:droplast(
     lists:flatten(
-      [[integer_to_list(X), ",", integer_to_list(Y), ","] || [_SPid, X, Y] <- PosList]
+      [[Name, ",", integer_to_list(X), ",", integer_to_list(Y), ","] || [Name, X, Y] <- PosList]
     )
   ) of
     {'EXIT', _} -> failed;

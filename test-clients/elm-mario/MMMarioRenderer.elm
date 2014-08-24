@@ -14,6 +14,9 @@ getImage chara (w, h) =
 render : (Int, Int) -> GameState -> Element
 render (screenWidth, screenHeight) gameState =
     let
+        -- クライアント名
+        clientName = gameState.clientName
+
         -- スクリーンタイルサイズ
         screenTileWidth = screenWidth `div` tileWidth
         screenTileHeight = screenHeight `div` tileHeight
@@ -28,8 +31,9 @@ render (screenWidth, screenHeight) gameState =
 
         marioForm = move lastGameState.mario.pos . toForm <| marioImage
 
-        drawMario = \(idx, xy) -> move xy . toForm <| marioImage
-        marioForms = group <| map drawMario gameState.otherCharas
+        drawMario = \(idx, (name, xy)) -> move xy . toForm <| marioImage
+        filterMario = \(idx, (name, xy)) -> name /= clientName
+        marioForms = group <| map drawMario <| filter filterMario gameState.otherCharas
 
         stageForm = renderStage (0, 0) gameState.stageTiles
 

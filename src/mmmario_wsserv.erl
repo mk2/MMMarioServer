@@ -128,10 +128,17 @@ handle_info(Msg, S) ->
   {noreply, S}.
 
 %% eventメッセージをハンドリング
-%%
+%% moveイベント
 handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
   io:format("move request~n"),
   mmmario:move_player(PPid, Args),
+  {noreply, S};
+
+%% eventメッセージをハンドリンg
+%% nameイベント
+handle_cast({event, {name, Name}}, S = #wsservstate{ppid = PPid}) ->
+  io:format("name request~n"),
+  mmmario:change_player_name(PPid, Name),
   {noreply, S};
 
 %% 未知のイベントをハンドリング
@@ -151,7 +158,7 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   case do_handshake(CSock, maps:new()) of
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
-      {ok, PPid} = mmmario:new_player(self(), make_ref()), % キャラクターのFSMを起動しておく
+      {ok, PPid} = mmmario:new_player(self(), ""), % キャラクターのFSMを起動しておく
       {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
     {stop, Reason, _} -> {stop, Reason, S};
     _ -> {stop, "failed handshake with unknown reason", S}

@@ -3,6 +3,7 @@ module MMMarioClient where
 {--
 @author mk2
 @description
+
  --}
 
 import Graphics.Input (Input, input, button)
@@ -30,14 +31,18 @@ import MMMarioConfig (..)
 -- WebSocketからの受信データ
 port wsRecvData : Signal String
 
+-- クライアント名、JS側から与える
+port clientName : Signal String
+
 -- 入力シグナル
 -- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー, WSからの受信データ) を取得
 inputSignal =
   let delta = inSeconds <~ fps gameFps
-      keySignal = (,,,) <~ delta
+      keySignal = (,,,,) <~ delta
                          ~ Keyboard.arrows
                          ~ Keyboard.space
                          ~ wsRecvData
+                         ~ clientName
   in sampleOn delta keySignal
 
 -- ゲーム状態のシグナル
@@ -98,9 +103,9 @@ updateCharaImage m =
   m
 
 -- ゲーム関数
--- (更新秒, (矢印キー上下, 矢印キー左右), キーボード) -> ゲームステート -> ゲームステート
-stepGame : (Float, {x : Int, y : Int}, Bool, String) -> GameState -> GameState
-stepGame (delta, arr, space, recvData) gameState =
+-- (更新秒, (矢印キー上下, 矢印キー左右), キーボード, WS受信データ, クライアント名) -> ゲームステート -> ゲームステート
+stepGame : (Float, {x : Int, y : Int}, Bool, String, String) -> GameState -> GameState
+stepGame (delta, arr, space, recvData, clientName) gameState =
   let
       -- 更新前のマリオ
       preMario = gameState.mario
@@ -124,12 +129,13 @@ stepGame (delta, arr, space, recvData) gameState =
       poss = split "," recvData
       numCharas = (length poss) `div` 2
       maybeFloat = maybe 0.0 (\n -> n) . S.toFloat
-      cnvToFloat = \(strX, strY) -> (maybeFloat strX, maybeFloat strY)
-      otherCharas = log "otherCharas" <| zip [1 .. numCharas] <| map cnvToFloat <| takeCycle 2 poss
+      cnvToFloat = \[name, strX, strY] -> (name, (maybeFloat strX, maybeFloat strY))
+      otherCharas = log "otherCharas" <| zip [1 .. numCharas] <| map cnvToFloat <| takeCycleAsList 3 poss
 
   in { gameState | mario <- newMario
                  , sendData <- marioPosStr
-                 , otherCharas <- otherCharas }
+                 , otherCharas <- otherCharas
+                 , clientName <- clientName }
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Element

@@ -16,7 +16,7 @@
 %%%%%%%%%%%% RELEASE %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
--export([start_link/2, move_player/2, get_pos/1]).
+-export([start_link/2, move_player/2, change_player_name/2]).
 %% 状態関数
 -export([move/2]).
 %% gen_fsm callbacks
@@ -54,11 +54,14 @@ start_link(WSServPid, Name) ->
   gen_fsm:start_link(?MODULE, [WSServPid, Name], []).
 
 %% プレイヤーを動かす
+%%
 move_player(PPid, XY = {_, _}) ->
   gen_fsm:send_event(PPid, {move, XY}).
 
-get_pos(PPid) ->
-  gen_fsm:sync_send_all_state_event(PPid, get_pos).
+%% 名前変更を行う
+%%
+change_player_name(PPid, Name) ->
+  gen_fsm:send_all_state_event(PPid, {name, Name}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -74,13 +77,15 @@ init([WSServPid, Name]) ->
 
 %% 動作可能状態
 %% moveイベントが来たらmove状態へ移動
-move({move, {X, Y}}, S = #pstate{}) ->
+move({move, {X, Y}}, S = #pstate{name = Name}) ->
   io:format("new posX: ~p posY: ~p~n", [X, Y]),
-  mmmario_event_handler:notify({update_chara_pos, self(), {X, Y}}),
+  mmmario_event_handler:notify({update_chara_pos, self(), Name, {X, Y}}),
   {next_state, move, S#pstate{pos = {X, Y}}}.
 
-handle_event(_Event, SName, S) ->
-  {next_state, SName, S}.
+%% 名前書き換え
+%% いつでも受け取る
+handle_event({name, Name}, SName, S) ->
+  {next_state, SName, S#pstate{name = Name}}.
 
 handle_sync_event(_Event, _From, SName, S) ->
   Reply = ok,

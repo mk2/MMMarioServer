@@ -25,7 +25,7 @@ gameFps = 60
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
-requestFps = 1
+requestFps = 5
 
 -- タイルの幅(px)
 tileWidth = 64
@@ -77,6 +77,7 @@ initialGameState = {
                    , screenTileHeight = 10
                    , sendData = ""
                    , otherCharas = []
+                   , clientName = ""
                    }
 
 -- マリオのジャンプ加速度

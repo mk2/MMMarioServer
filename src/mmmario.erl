@@ -12,7 +12,7 @@
 
 -ifndef(DEBUG).
 %% API
--export([start/2, stop/1, new_player/2, exit_player/1, move_player/2]).
+-export([start/2, stop/1, new_player/2, exit_player/1, move_player/2, change_player_name/2]).
 -else.
 -compile([debug_info, export_all]).
 -endif.
@@ -31,3 +31,6 @@ exit_player(PPid) ->
 
 move_player(PPid, Pos = {_, _}) ->
   mmmario_player:move_player(PPid, Pos).
+
+change_player_name(PPid, Name) ->
+  mmmario_player:change_player_name(PPid, Name).
