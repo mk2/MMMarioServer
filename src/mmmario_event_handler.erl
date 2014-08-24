@@ -72,6 +72,22 @@ handle_event({update_chara_pos, SenderPPid, {X, Y}}, S) ->
   end,
   io:format("character positions (except event fire process): ~p~n", [CharaPos]),
   {ok, S};
+
+%% キャラの削除イベントを受け取る
+%%
+handle_event({delete_chara, SenderPPid}, S) ->
+  % etsからキー {chara_pos, SenderPPid}の値を削除
+  ets:delete(?MODULE, {chara_pos, SenderPPid}),
+  % etsからキー {chara_pos, _}の値を拾う
+  CharaPos = ets:match(?MODULE, {{chara_pos, '$1'}, {'$2', '$3'}}),
+  case mmmario_event_helper:pos_list_to_binary(CharaPos) of
+    {ok, Str} ->
+      [mmmario_wsserv:send(WSServPid, Str) || WSServPid <- mmmario_wsserv_sup:childPids()];
+    _ -> ok
+  end,
+  io:format("character positions (except event fire process): ~p~n", [CharaPos]),
+  {ok, S};
+
 handle_event(_Event, S) ->
   {ok, S}.
 

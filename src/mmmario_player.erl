@@ -68,6 +68,7 @@ get_pos(PPid) ->
 %% 初期化後はidle状態にしてプレイヤーからのイベントを待つ
 init([WSServPid, Name]) ->
   HandlerId = mmmario_event_handler:add_handler(),
+  process_flag(trap_exit, true),
   link(WSServPid),
   {ok, move, #pstate{wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
 
@@ -77,10 +78,6 @@ move({move, {X, Y}}, S = #pstate{}) ->
   io:format("new posX: ~p posY: ~p~n", [X, Y]),
   mmmario_event_handler:notify({update_chara_pos, self(), {X, Y}}),
   {next_state, move, S#pstate{pos = {X, Y}}}.
-
-state_name(_Event, _From, S) ->
-  Reply = ok,
-  {reply, Reply, state_name, S}.
 
 handle_event(_Event, SName, S) ->
   {next_state, SName, S}.
@@ -92,8 +89,9 @@ handle_sync_event(_Event, _From, SName, S) ->
 handle_info(_Info, SName, S) ->
   {next_state, SName, S}.
 
-terminate(Reason, _SName, S = #pstate{ehdlr = HandlerId}) ->
+terminate(Reason, _SName, #pstate{ehdlr = HandlerId}) ->
   io:format("terminating player with: ~p~n", [Reason]),
+  mmmario_event_handler:notify({delete_chara, self()}),
   mmmario_event_handler:remove_handler(HandlerId),
   ok.
 

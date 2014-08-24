@@ -31,7 +31,8 @@ start_player(WSServPid, Name) ->
 
 exit_player(PPid) ->
   io:format("terminate child: ~p~n", [PPid]),
-  supervisor:terminate_child(?SERVER, PPid).
+  ok = supervisor:terminate_child(?SERVER, PPid),
+  ok = supervisor:delete_child(?SERVER, PPid).
 
 children() ->
   supervisor:which_children(?SERVER).

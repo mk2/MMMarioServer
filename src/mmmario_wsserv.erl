@@ -96,6 +96,7 @@ send(Pid, Data) ->
 %% gen_serverコールバック
 %% accept処理をここでやらずにcastしてるのは、accept処理中はポーリング状態になるため。{ok, _}をすぐに返さないと怒られる希ガス
 init(LSock) ->
+  process_flag(trap_exit, true),
   gen_server:cast(self(), accept),
   {ok, #wsservstate{lsock = LSock}}.
 
@@ -218,7 +219,7 @@ handle_cast(Others, S) ->
 
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
-terminate(Reason, S = #wsservstate{csock = CSock, ppid = PPid}) ->
+terminate(Reason, #wsservstate{csock = CSock, ppid = PPid}) ->
   io:format("terminating wsserv with: ~p~n", [Reason]),
   gen_tcp:close(CSock),
   mmmario:exit_player(PPid),
