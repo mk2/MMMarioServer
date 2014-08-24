@@ -109,14 +109,31 @@ Elm.MMMarioClient.make = function (_elm) {
             switch (_v0.ctor) {
                 case "_Tuple4":
                     return function () {
+                        var maybeFloat = function ($) {
+                            return A2(Maybe.maybe,
+                                0.0,
+                                function (n) {
+                                    return n;
+                                })(String.toFloat($));
+                        };
+                        var cnvToFloat = function (_v6) {
+                            return function () {
+                                switch (_v6.ctor) {
+                                    case "_Tuple2":
+                                        return {ctor: "_Tuple2", _0: maybeFloat(_v6._0), _1: maybeFloat(_v6._1)};
+                                }
+                                _E.Case($moduleName,
+                                    "on line 127, column 38 to 70");
+                            }();
+                        };
                         var poss = A2(String.split,
                             ",",
                             _v0._3);
                         var numCharas = List.length(poss) / 2 | 0;
                         var otherCharas = Debug.log("otherCharas")(List.zip(_L.range(1,
-                            numCharas))(A2(MMMarioUtil.takeCycle,
+                            numCharas))(List.map(cnvToFloat)(A2(MMMarioUtil.takeCycle,
                             2,
-                            poss)));
+                            poss))));
                         var moveAccel = A2(MMMarioVector.multVec,
                             MMMarioConfig.moveCoeff,
                             {ctor: "_Tuple2", _0: Basics.toFloat(_v0._1.x), _1: 0});
@@ -142,12 +159,14 @@ Elm.MMMarioClient.make = function (_elm) {
                                     , newMario]
                                 ,
                                 ["sendData", marioPosStr]
+                                ,
+                                ["otherCharas", otherCharas]
                             ],
                             gameState);
                     }();
             }
             _E.Case($moduleName,
-                "between lines 103 and 129");
+                "between lines 104 and 132");
         }();
     });
     var sendData = function (gameState) {
@@ -202,6 +221,89 @@ Elm.MMMarioClient.make = function (_elm) {
         gameStateSignal);
     _elm.MMMarioClient.values = {_op: _op, inputSignal: inputSignal, gameStateSignal: gameStateSignal, sendData: sendData, calcCharaAccel: calcCharaAccel, calcCharaPos: calcCharaPos, updateCharaImage: updateCharaImage, stepGame: stepGame, display: display, main: main};
     return _elm.MMMarioClient.values;
+};
+Elm.MMMarioUtil = Elm.MMMarioUtil || {};
+Elm.MMMarioUtil.make = function (_elm) {
+    "use strict";
+    _elm.MMMarioUtil = _elm.MMMarioUtil || {};
+    if (_elm.MMMarioUtil.values)
+        return _elm.MMMarioUtil.values;
+    var _N = Elm.Native,
+        _U = _N.Utils.make(_elm),
+        _L = _N.List.make(_elm),
+        _A = _N.Array.make(_elm),
+        _E = _N.Error.make(_elm),
+        $moduleName = "MMMarioUtil";
+    var Basics = Elm.Basics.make(_elm);
+    var Color = Elm.Color.make(_elm);
+    var Graphics = Graphics || {};
+    Graphics.Collage = Elm.Graphics.Collage.make(_elm);
+    var Graphics = Graphics || {};
+    Graphics.Element = Elm.Graphics.Element.make(_elm);
+    var List = Elm.List.make(_elm);
+    var MMMarioConfig = Elm.MMMarioConfig.make(_elm);
+    var Maybe = Elm.Maybe.make(_elm);
+    var Native = Native || {};
+    Native.Json = Elm.Native.Json.make(_elm);
+    var Native = Native || {};
+    Native.Ports = Elm.Native.Ports.make(_elm);
+    var Signal = Elm.Signal.make(_elm);
+    var String = Elm.String.make(_elm);
+    var Text = Elm.Text.make(_elm);
+    var Time = Elm.Time.make(_elm);
+    var _op = {};
+    var getTileYCoord = function (pos) {
+        return pos / MMMarioConfig.tileHeight | 0;
+    };
+    var getTileXCoord = function (pos) {
+        return pos / MMMarioConfig.tileWidth | 0;
+    };
+    var absRound = function ($) {
+        return Basics.round(Basics.abs($));
+    };
+    var takeCycleAsList$ = F3(function (n, l, accum) {
+        return function () {
+            var notEnough = _U.cmp(List.length(l),
+                n) < 0;
+            return notEnough ? accum : A3(takeCycleAsList$,
+                n,
+                A2(List.drop, n, l),
+                _L.append(accum,
+                    _L.fromArray([A2(List.take,
+                        n,
+                        l)])));
+        }();
+    });
+    var takeCycleAsList = F2(function (n, l) {
+        return A3(takeCycleAsList$,
+            n,
+            l,
+            _L.fromArray([]));
+    });
+    var list2tuple = function (l) {
+        return {ctor: "_Tuple2", _0: List.head(l), _1: List.last(l)};
+    };
+    var takeCycle$ = F3(function (n, l, accum) {
+        return function () {
+            var notEnough = _U.cmp(List.length(l),
+                n) < 0;
+            return notEnough ? accum : A3(takeCycle$,
+                n,
+                A2(List.drop, n, l),
+                _L.append(accum,
+                    _L.fromArray([list2tuple(A2(List.take,
+                        n,
+                        l))])));
+        }();
+    });
+    var takeCycle = F2(function (n, l) {
+        return A3(takeCycle$,
+            n,
+            l,
+            _L.fromArray([]));
+    });
+    _elm.MMMarioUtil.values = {_op: _op, list2tuple: list2tuple, takeCycle: takeCycle, takeCycle$: takeCycle$, takeCycleAsList: takeCycleAsList, takeCycleAsList$: takeCycleAsList$, absRound: absRound, getTileXCoord: getTileXCoord, getTileYCoord: getTileYCoord};
+    return _elm.MMMarioUtil.values;
 };
 Elm.MMMarioRenderer = Elm.MMMarioRenderer || {};
 Elm.MMMarioRenderer.make = function (_elm) {
@@ -277,7 +379,7 @@ Elm.MMMarioRenderer.make = function (_elm) {
                         Array.fromList(stageTileRows))));
             }
             _E.Case($moduleName,
-                "on line 41, column 5 to 128");
+                "on line 44, column 5 to 128");
         }();
     });
     var getImage = F2(function (chara, _v5) {
@@ -325,9 +427,23 @@ Elm.MMMarioRenderer.make = function (_elm) {
                         var marioImage = A2(getImage,
                             lastGameState.mario,
                             {ctor: "_Tuple2", _0: 20, _1: 35});
+                        var drawMario = function (_v13) {
+                            return function () {
+                                switch (_v13.ctor) {
+                                    case "_Tuple2":
+                                        return Graphics.Collage.move(_v13._1)(Graphics.Collage.toForm(marioImage));
+                                }
+                                _E.Case($moduleName,
+                                    "on line 31, column 35 to 65");
+                            }();
+                        };
+                        var marioForms = Graphics.Collage.group(A2(List.map,
+                            drawMario,
+                            gameState.otherCharas));
                         var marioForm = Graphics.Collage.move(lastGameState.mario.pos)(Graphics.Collage.toForm(marioImage));
                         var stageWholeForm = Graphics.Collage.move({ctor: "_Tuple2", _0: moveToX, _1: moveToY})(Graphics.Collage.group(_L.fromArray([stageForm
-                            , marioForm])));
+                            , marioForm
+                            , marioForms])));
                         return A3(Graphics.Collage.collage,
                             _v9._0,
                             _v9._1,
@@ -336,7 +452,7 @@ Elm.MMMarioRenderer.make = function (_elm) {
                     }();
             }
             _E.Case($moduleName,
-                "between lines 16 and 37");
+                "between lines 16 and 40");
         }();
     });
     _elm.MMMarioRenderer.values = {_op: _op, getImage: getImage, render: render, renderStage: renderStage, renderTileRow: renderTileRow, renderTile: renderTile};
@@ -387,7 +503,7 @@ Elm.MMMarioConfig.make = function (_elm) {
         "images/");
     var tileHeight = 64;
     var tileWidth = 64;
-    var requestFps = 0.2;
+    var requestFps = 30;
     var gameFps = 60;
     var gndColor = A3(Color.rgb,
         188,
@@ -486,82 +602,6 @@ Elm.MMMarioType.make = function (_elm) {
     var RChara = {ctor: "RChara"};
     _elm.MMMarioType.values = {_op: _op, RChara: RChara, RBlock: RBlock, RItem: RItem, None: None, Cloud: Cloud, Ground: Ground, UserInput: UserInput, Chara: Chara, GameState: GameState};
     return _elm.MMMarioType.values;
-};
-Elm.MMMarioUtil = Elm.MMMarioUtil || {};
-Elm.MMMarioUtil.make = function (_elm) {
-    "use strict";
-    _elm.MMMarioUtil = _elm.MMMarioUtil || {};
-    if (_elm.MMMarioUtil.values)
-        return _elm.MMMarioUtil.values;
-    var _N = Elm.Native,
-        _U = _N.Utils.make(_elm),
-        _L = _N.List.make(_elm),
-        _A = _N.Array.make(_elm),
-        _E = _N.Error.make(_elm),
-        $moduleName = "MMMarioUtil";
-    var Basics = Elm.Basics.make(_elm);
-    var Color = Elm.Color.make(_elm);
-    var Graphics = Graphics || {};
-    Graphics.Collage = Elm.Graphics.Collage.make(_elm);
-    var Graphics = Graphics || {};
-    Graphics.Element = Elm.Graphics.Element.make(_elm);
-    var List = Elm.List.make(_elm);
-    var Maybe = Elm.Maybe.make(_elm);
-    var Native = Native || {};
-    Native.Json = Elm.Native.Json.make(_elm);
-    var Native = Native || {};
-    Native.Ports = Elm.Native.Ports.make(_elm);
-    var Signal = Elm.Signal.make(_elm);
-    var String = Elm.String.make(_elm);
-    var Text = Elm.Text.make(_elm);
-    var Time = Elm.Time.make(_elm);
-    var _op = {};
-    var absRound = function ($) {
-        return Basics.round(Basics.abs($));
-    };
-    var takeCycleAsList$ = F3(function (n, l, accum) {
-        return function () {
-            var notEnough = _U.cmp(List.length(l),
-                n) < 0;
-            return notEnough ? accum : A3(takeCycleAsList$,
-                n,
-                A2(List.drop, n, l),
-                _L.append(accum,
-                    _L.fromArray([A2(List.take,
-                        n,
-                        l)])));
-        }();
-    });
-    var takeCycleAsList = F2(function (n, l) {
-        return A3(takeCycleAsList$,
-            n,
-            l,
-            _L.fromArray([]));
-    });
-    var list2tuple = function (l) {
-        return {ctor: "_Tuple2", _0: List.head(l), _1: List.last(l)};
-    };
-    var takeCycle$ = F3(function (n, l, accum) {
-        return function () {
-            var notEnough = _U.cmp(List.length(l),
-                n) < 0;
-            return notEnough ? accum : A3(takeCycle$,
-                n,
-                A2(List.drop, n, l),
-                _L.append(accum,
-                    _L.fromArray([list2tuple(A2(List.take,
-                        n,
-                        l))])));
-        }();
-    });
-    var takeCycle = F2(function (n, l) {
-        return A3(takeCycle$,
-            n,
-            l,
-            _L.fromArray([]));
-    });
-    _elm.MMMarioUtil.values = {_op: _op, list2tuple: list2tuple, takeCycle: takeCycle, takeCycle$: takeCycle$, takeCycleAsList: takeCycleAsList, takeCycleAsList$: takeCycleAsList$, absRound: absRound};
-    return _elm.MMMarioUtil.values;
 };
 Elm.MMMarioVector = Elm.MMMarioVector || {};
 Elm.MMMarioVector.make = function (_elm) {

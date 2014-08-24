@@ -1,7 +1,7 @@
 module MMMarioRenderer where
 
 import Graphics.Collage (..)
-import Array (..)
+import Array (indexedMap, toList, fromList)
 
 import MMMarioConfig (..)
 import MMMarioType (..)
@@ -28,11 +28,14 @@ render (screenWidth, screenHeight) gameState =
 
         marioForm = move lastGameState.mario.pos . toForm <| marioImage
 
+        drawMario = \(idx, xy) -> move xy . toForm <| marioImage
+        marioForms = group <| map drawMario gameState.otherCharas
+
         stageForm = renderStage (0, 0) gameState.stageTiles
 
         moveToX = toFloat <| -screenWidth `div` 2
         moveToY = toFloat <| -screenHeight `div` 2
-        stageWholeForm = move (moveToX, moveToY) . group <| [stageForm, marioForm]
+        stageWholeForm = move (moveToX, moveToY) . group <| [stageForm, marioForm, marioForms]
 
     in collage screenWidth screenHeight [bgForm, stageWholeForm]
 

@@ -3,7 +3,6 @@ module MMMarioClient where
 {--
 @author mk2
 @description
-
  --}
 
 import Graphics.Input (Input, input, button)
@@ -14,6 +13,8 @@ import Graphics.Element (image, fittedImage, croppedImage)
 import WebSocket
 import Debug (log)
 import String (split, show)
+import Maybe
+import String as S
 
 -- 自作ライブラリのimport
 import MMMarioVector (..)
@@ -122,11 +123,13 @@ stepGame (delta, arr, space, recvData) gameState =
       -- 別キャラの位置
       poss = split "," recvData
       numCharas = (length poss) `div` 2
-      otherCharas = log "otherCharas" <| zip [1 .. numCharas] <| takeCycle 2 poss
+      maybeFloat = maybe 0.0 (\n -> n) . S.toFloat
+      cnvToFloat = \(strX, strY) -> (maybeFloat strX, maybeFloat strY)
+      otherCharas = log "otherCharas" <| zip [1 .. numCharas] <| map cnvToFloat <| takeCycle 2 poss
 
   in { gameState | mario <- newMario
                  , sendData <- marioPosStr
-     }
+                 , otherCharas <- otherCharas }
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Element

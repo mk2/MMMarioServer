@@ -25,7 +25,7 @@ gameFps = 60
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
-requestFps = 0.2
+requestFps = 30
 
 -- タイルの幅(px)
 tileWidth = 64

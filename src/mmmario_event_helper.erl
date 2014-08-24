@@ -28,7 +28,11 @@ text_to_event(RawText) ->
 %% 位置配列[{X, Y}, {X, Y} ... ]を文字列化する
 %%
 pos_list_to_binary(PosList) ->
-  case catch lists:droplast(lists:flatten([[integer_to_list(X), ",", integer_to_list(Y), ","] || {X, Y} <- PosList])) of
+  case catch lists:droplast(
+    lists:flatten(
+      [[integer_to_list(X), ",", integer_to_list(Y), ","] || [_SPid, X, Y] <- PosList]
+    )
+  ) of
     {'EXIT', _} -> failed;
     Str -> {ok, list_to_binary(Str)}
   end.
