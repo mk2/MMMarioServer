@@ -123,7 +123,7 @@ Elm.MMMarioClient.make = function (_elm) {
                                         return {ctor: "_Tuple2", _0: maybeFloat(_v6._0), _1: maybeFloat(_v6._1)};
                                 }
                                 _E.Case($moduleName,
-                                    "on line 128, column 38 to 70");
+                                    "on line 127, column 38 to 70");
                             }();
                         };
                         var poss = A2(String.split,
@@ -166,7 +166,7 @@ Elm.MMMarioClient.make = function (_elm) {
                     }();
             }
             _E.Case($moduleName,
-                "between lines 105 and 133");
+                "between lines 104 and 132");
         }();
     });
     var sendData = function (gameState) {
@@ -503,7 +503,7 @@ Elm.MMMarioConfig.make = function (_elm) {
         "images/");
     var tileHeight = 64;
     var tileWidth = 64;
-    var requestFps = 10;
+    var requestFps = 1;
     var gameFps = 60;
     var gndColor = A3(Color.rgb,
         188,

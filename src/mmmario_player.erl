@@ -89,10 +89,9 @@ handle_sync_event(_Event, _From, SName, S) ->
 handle_info(_Info, SName, S) ->
   {next_state, SName, S}.
 
-terminate(Reason, _SName, #pstate{ehdlr = HandlerId}) ->
+terminate(Reason, _SName, #pstate{}) ->
   io:format("terminating player with: ~p~n", [Reason]),
   mmmario_event_handler:notify({delete_chara, self()}),
-  mmmario_event_handler:remove_handler(HandlerId),
   ok.
 
 code_change(_OldVsn, SName, S, _Extra) ->
