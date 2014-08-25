@@ -87,13 +87,27 @@ calcCharaAccel delta moveAccel fricAccel gravityAccel willJump m =
 
 -- キャラクターの位置を計算
 -- mにある加速度で位置を計算し、その位置が適切なものならばそれに更新、違っているならそのまま
-calcCharaPos delta m =
+calcCharaPos gameState delta m =
   let
+      -- 速度と位置を計算
+      (px, py) = m.pos
       (sx, sy) = clampVec minSpd maxSpd . addVec m.spd . multVec delta <| m.acc
       (nx, ny) = addVec m.pos (sx, sy)
+
+      -- マリオのタイル位置
+      marioTileX = getTileXCoord . round <| nx
+      marioTileY = getTileYCoord . round <| ny
+
+      stageTile = log "stageTile" <| getStageTile gameState.stageTiles marioTileX marioTileY
+
   in if | ny < 0 -> { m | pos <- clampVec minPos maxPos (nx, 0)
                         , spd <- (sx, 0)
                         , isTouchOnDownBlock <- True }
+
+        | stageTile == Ground -> { m | spd <- (sx, 0)
+                                     , pos <- (nx, py)
+                                     , isTouchOnDownBlock <- True }
+
         | otherwise -> { m | pos <- clampVec minPos maxPos (nx, ny)
                            , spd <- (sx, sy) }
 
@@ -116,7 +130,7 @@ stepGame (delta, arr, space, recvData, clientName) gameState =
       fricAccel = multVec fricCoeff (revVec preMario.spd)
 
       -- 更新関数
-      updateChara = updateCharaImage . calcCharaPos delta . calcCharaAccel delta moveAccel fricAccel gravityAccel space
+      updateChara = updateCharaImage . calcCharaPos gameState delta . calcCharaAccel delta moveAccel fricAccel gravityAccel space
 
       -- マリオを更新する
       newMario = updateChara preMario

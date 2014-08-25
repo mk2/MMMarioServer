@@ -47,12 +47,14 @@ renderStage : (Int, Int) -> [[StageTile]] -> Form
 renderStage (stageTileWidth, stageTileHeight) stageTileRows =
     group . toList <| indexedMap (\row stageTileRow -> group . justs <| renderTileRow row stageTileRow) (fromList stageTileRows)
 
+-- タイル一列を表示する関数
 renderTileRow : Int -> [StageTile] -> [Maybe Form]
 renderTileRow row stageTiles =
     let
         my = toFloat <| tileHeight * row
     in toList <| indexedMap (\mx stageTile -> renderTile ((toFloat <| tileWidth * mx), my) stageTile) (fromList stageTiles)
 
+-- タイル一枚を表示する関数
 renderTile : (Float, Float) -> StageTile -> Maybe Form
 renderTile moveXY stageTile =
     case stageTile of

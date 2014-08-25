@@ -1,6 +1,8 @@
 module MMMarioUtil where
 
+import MMMarioType (..)
 import MMMarioConfig (..)
+import Array
 
 -- リストをタプルに。
 -- ex: [1, 2] -> (1, 2)
@@ -24,7 +26,18 @@ takeCycleAsList' n l accum =
 absRound = round . abs
 
 -- タイルのX座標を求める
-getTileXCoord pos =
-    pos `div` tileWidth
-getTileYCoord pos =
-    pos `div` tileHeight
+getTileXCoord posX =
+    posX `div` tileWidth
+
+-- タイルのY座標を求める
+getTileYCoord posY =
+    posY `div` tileHeight
+
+-- タイルのX座標にあるStageTileを求める
+getStageTile stageTileRows xcoord ycoord =
+    let
+        stageTileRowsArray = Array.fromList stageTileRows
+        stageTileRow = maybe [None] (\n -> n) <| Array.get ycoord stageTileRowsArray -- Maybe [StageTile]が返ってくる
+        stageTileRowArray = Array.fromList stageTileRow
+        stageTile = maybe None (\n -> n) <| Array.get xcoord stageTileRowArray -- Maybe StageTileが返ってくる
+    in stageTile
