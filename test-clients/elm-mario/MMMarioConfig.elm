@@ -55,9 +55,9 @@ minSpd = (-5, -5)
 -- 標準のキャラクター
 defaultChara : Chara
 defaultChara = {
-                 pos = zero
-               , spd = zero
-               , acc = zero
+                 pos = zeroVec
+               , spd = zeroVec
+               , acc = zeroVec
                , isTouchOnTopBlock = False
                , isTouchOnLeftBlock = False
                , isTouchOnDownBlock = False
