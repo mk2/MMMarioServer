@@ -34,18 +34,21 @@ port wsRecvData : Signal String
 port clientName : Signal String
 
 -- 入力シグナル
--- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー, WSからの受信データ, クライアント名, ウィンドウサイズ, (ランダムなブロックサイズ)) を取得
+-- delta更新毎にkeySignal (デルタ秒, (矢印キー), スペースキー, WSからの受信データ, クライアント名, ウィンドウサイズ, (ランダムなブロックレクト)) を取得
 inputSignal = let delta = inSeconds <~ fps gameFps
+                  randomBlockX = Random.range 0 stageWidth delta
+                  randomBlockY = Random.range 0 stageHeight delta
                   randomBlockWidth = Random.range minBlockSizeWidth maxBlockSizeWidth delta
                   randomBlockHeight = Random.range minBlockSizeHeight maxBlockSizeHeight delta
-                  keySignal = (,,,,,,,) <~ delta
-                                         ~ Keyboard.arrows
-                                         ~ Keyboard.space
-                                         ~ wsRecvData
-                                         ~ clientName
-                                         ~ Window.dimensions
-                                         ~ randomBlockWidth
-                                         ~ randomBlockHeight
+                  genBlock = \blkX blkY blkW blkH -> { origin = vec (blkX, blkY), size = vec (blkW, blkH) }
+                  blockSignal = genBlock <~ randomBlockX ~ randomBlockY ~ randomBlockWidth ~ randomBlockHeight
+                  keySignal = (,,,,,,) <~ delta
+                                        ~ Keyboard.arrows
+                                        ~ Keyboard.space
+                                        ~ wsRecvData
+                                        ~ clientName
+                                        ~ Window.dimensions
+                                        ~ blockSignal
               in sampleOn delta keySignal
 
 -- ゲーム状態のシグナル
@@ -66,6 +69,19 @@ port wsSendData = let sendData = (\gameState -> gameState.sendData)
 {--================================================================--}
 {-- 処理関数 --}
 {--================================================================--}
+
+moveBlock delta blkRect mass baseSpd =
+    let massCoeff = (/) (getArea blkRect) mass
+        moveStep = log "moveStep" <| multVec delta . multVec massCoeff <| baseSpd
+    in moveRect moveStep blkRect
+
+stageRect = { origin = zeroVec, size = vec (stageWidth, stageHeight) }
+
+checkBlock blkRect =
+    let overlapRect = getOverlapRect blkRect stageRect
+    in case overlapRect of
+        Nothing -> False
+        _ -> True
 
 -- キャラクターの速度を計算
 -- 計算方法
@@ -100,11 +116,17 @@ updateCharaImage m =
     m
 
 -- ゲーム関数
--- (更新秒, (矢印キー上下, 矢印キー左右), キーボード, WS受信データ, クライアント名, ウィンドウサイズ, ランダム数) -> ゲームステート -> ゲームステート
-stepGame : (Float, {x : Int, y : Int}, Bool, String, String, (Int, Int), Int, Int) -> GameState -> GameState
-stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkW, blkH) gameState =
+-- (更新秒, (矢印キー上下, 矢印キー左右), キーボード, WS受信データ, クライアント名, ウィンドウサイズ, ブロック) -> ゲームステート -> ゲームステート
+stepGame : (Float, {x : Int, y : Int}, Bool, String, String, (Int, Int), Rect) -> GameState -> GameState
+stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRect) gameState =
     let
-        d = delta
+        d = log "blkRect" <| blkRect
+
+        moveSpd = vec (0, 10)
+
+        newBlks = filter checkBlock . map (\blkRect -> moveBlock delta blkRect 2000 moveSpd) <| gameState.blocks
+        blks = log "blks" <| length newBlks
+
         -- 更新前のマリオ
         --preMario = gameState.mario
 
@@ -128,6 +150,7 @@ stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkW, 
                      sendData <- ""
                    , otherCharas <- []
                    , clientName <- clientName
+                   , blocks <- blkRect :: newBlks
                    , windowDims <- (winWidth, winHeight) }
 
 -- ディスプレイ関数

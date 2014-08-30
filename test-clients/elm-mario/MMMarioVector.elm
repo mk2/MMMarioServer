@@ -34,6 +34,9 @@ type Rect = {
 -- ベクトル関係の関数
 -- ================================================================
 
+vec : (Int, Int) -> Vec
+vec (x, y) = (toFloat x, toFloat y)
+
 -- ゼロベクトル
 zeroVec : Vec
 zeroVec = (0, 0)
@@ -84,11 +87,18 @@ clampVec (minX, minY) (maxX, maxY) (x, y) = (clamp minX maxX x, clamp minY maxY 
 -- レクト関係の関数
 -- ================================================================
 
+getOriginX : Rect -> Float
 getOriginX rect = getx rect.origin
+getOriginY : Rect -> Float
 getOriginY rect = gety rect.origin
 
+getSizeW : Rect -> Float
 getSizeW rect = getx rect.size
+getSizeH : Rect -> Float
 getSizeH rect = gety rect.size
+
+getArea : Rect -> Float
+getArea {size} = uncurry (*) size
 
 -- サイズゼロのレクト
 zeroRect : Rect

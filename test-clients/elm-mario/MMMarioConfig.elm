@@ -16,8 +16,10 @@ cldColor = rgb 255 255 255
 -- 土の色
 gndColor = rgb 188 118 71
 
+linColor = rgb 200 200 200
+
 -- ゲームのFPS
-gameFps = 60
+gameFps = 10
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
@@ -42,6 +44,9 @@ maxBlockSizeWidth = 100
 maxBlockSizeHeight = 100
 minBlockSizeWidth = 50
 minBlockSizeHeight = 50
+
+stageWidth = 640
+stageHeight = 640
 
 -- 最大速度
 maxSpd = (10, 10)
