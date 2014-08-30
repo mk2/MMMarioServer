@@ -12,9 +12,8 @@ type UserInput = {
                  }
 
 type Chara = {
-               pos : Vec
+               rect: Rect
              , spd : Vec
-             , acc : Vec
              , isTouchOnTopBlock : Bool
              , isTouchOnLeftBlock : Bool
              , isTouchOnDownBlock : Bool
@@ -27,12 +26,10 @@ type Chara = {
 
 type GameState = {
                    mario : Chara
-                 , stageTileWidth : Float
-                 , stageTileHeight : Float
-                 , stageTiles : [[StageTile]]
-                 , screenTileWidth : Float
-                 , screenTileHeight : Float
+                 , blocks : [Rect]
+                 , stageSize : Vec
                  , otherCharas : [(Int, (String, Vec))]
                  , sendData : String
                  , clientName : String
+                 , windowDims : (Int, Int)
                  }

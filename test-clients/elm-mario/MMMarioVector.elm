@@ -2,15 +2,30 @@ module MMMarioVector where
 
 {-| ベクター関連のモジュール
     Rect系もここに押し込んどく
+
+# 型
+@docs Vec, Rect
+
+# ベクトル計算
+@docs addVec, subVec, multVec, dotVec, negVec, lenVec
+
+# ベクトル要素取り出し
+@docs getx, gety
+
+# レクト計算
+@docs moveRect, resizeRect
+
  -}
 
 -- ================================================================
 -- 型宣言
 -- ================================================================
 
+{-| ベクトル型。タプルで表現 -}
 type Vec = (Float, Float)
 
-type Rect = { 
+{-| レクト型 -}
+type Rect = {
               origin : Vec
             , size : Vec
             }
@@ -27,7 +42,10 @@ zeroVec = (0, 0)
 unitVec : Vec
 unitVec = (1, 1)
 
--- ベクトルの足し算
+{-| ベクトルの足し算
+
+    addVec (1, 1) (2, 2) == (3, 3)
+ -}
 addVec : Vec -> Vec -> Vec
 addVec (x, y) (mx, my) = (x + mx, y + my)
 
@@ -53,9 +71,11 @@ lenVec (x, y) = sqrt <| x*x + y*y
 
 -- x要素
 getx = fst
+getw = fst
 
 -- y要素
 gety = snd
+geth = snd
 
 -- ベクトルをクランプする
 clampVec (minX, minY) (maxX, maxY) (x, y) = (clamp minX maxX x, clamp minY maxY y)
@@ -63,6 +83,12 @@ clampVec (minX, minY) (maxX, maxY) (x, y) = (clamp minX maxX x, clamp minY maxY 
 -- ================================================================
 -- レクト関係の関数
 -- ================================================================
+
+getOriginX rect = getx rect.origin
+getOriginY rect = gety rect.origin
+
+getSizeW rect = getx rect.size
+getSizeH rect = gety rect.size
 
 -- サイズゼロのレクト
 zeroRect : Rect
