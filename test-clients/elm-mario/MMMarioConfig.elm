@@ -19,7 +19,7 @@ gndColor = rgb 188 118 71
 linColor = rgb 200 200 200
 
 -- ゲームのFPS
-gameFps = 10
+gameFps = 5
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
@@ -40,10 +40,10 @@ imageBaseUrl = resourceBaseUrl ++ "images/"
 maxPos = (640, 640)
 minPos = zeroVec
 
-maxBlockSizeWidth = 100
-maxBlockSizeHeight = 100
-minBlockSizeWidth = 50
-minBlockSizeHeight = 50
+maxBlockSizeWidth = 150
+maxBlockSizeHeight = 150
+minBlockSizeWidth = 25
+minBlockSizeHeight = 25
 
 stageWidth = 640
 stageHeight = 640
@@ -57,7 +57,7 @@ defaultChara : Chara
 defaultChara = {
                  rect = unitRect
                , spd = zeroVec
-               , isTouchOnTopBlock = False
+               , isTouchOnUpsideBlock = False
                , isTouchOnLeftBlock = False
                , isTouchOnDownBlock = False
                , isTouchOnRightBlock = False
@@ -70,12 +70,13 @@ defaultChara = {
 -- ゲームの初期状態
 initialGameState : GameState
 initialGameState = {
-                     mario = { defaultChara | rect <- { origin = (0, 100), size = (20, 32) }
-                                            , imageBaseName <- "mario"
-                                            , imagePoseName <- "stand"
-                                            , imageDireName <- "right"
-                                            }
+                     self = { defaultChara | rect <- { origin = (0, 100), size = (20, 32) }
+                                           , imageBaseName <- "mario"
+                                           , imagePoseName <- "stand"
+                                           , imageDireName <- "right"
+                                           }
                    , sendData = ""
+                   , ellapsedSeconds = 0.0
                    , blocks = []
                    , otherCharas = []
                    , clientName = ""

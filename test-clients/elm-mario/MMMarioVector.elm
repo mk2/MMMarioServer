@@ -34,14 +34,18 @@ type Rect = {
 -- ベクトル関係の関数
 -- ================================================================
 
+{-| コンストラクタ。IntのタプルからVecを生成
+
+    vec (1, 2) == (1.0, 2.0)
+ -}
 vec : (Int, Int) -> Vec
 vec (x, y) = (toFloat x, toFloat y)
 
--- ゼロベクトル
+{-| ゼロベクトル -}
 zeroVec : Vec
 zeroVec = (0, 0)
 
--- 単位ベクトル
+{-| 単位ベクトル -}
 unitVec : Vec
 unitVec = (1, 1)
 
@@ -52,35 +56,97 @@ unitVec = (1, 1)
 addVec : Vec -> Vec -> Vec
 addVec (x, y) (mx, my) = (x + mx, y + my)
 
--- ベクトルの引き算
+{-| ベクトルの引き算
+
+    subVec (3, 3) (1, 1) == (2, 2)
+ -}
 subVec : Vec -> Vec -> Vec
 subVec (x, y) (mx, my) = (x - mx, y - my)
 
--- ベクトルに係数をかける
+{-| ベクトルを係数倍
+
+    multVec 3.0 (1, 2) == (3, 6)
+ -}
 multVec : Float -> Vec -> Vec
 multVec k (x, y) = (x * k, y * k)
 
--- ベクトルの内積
+{-| ベクトルの内積を求める
+
+    dotVec (2, 3) (3, 2) == 13
+ -}
 dotVec : Vec -> Vec -> Float
 dotVec (x, y) (ax, ay) = x * ay + y * ax
 
--- ベクトルの反転
+{-| ベクトルを反転
+
+    negVec (1, 1) == (-1, -1)
+ -}
 negVec : Vec -> Vec
 negVec (x, y) = (-x, -y)
 
--- 長さ
+{-| ベクトルの長さを求める
+
+    lenVec (1, 1) == 1.4...
+ -}
 lenVec : Vec -> Float
 lenVec (x, y) = sqrt <| x*x + y*y
 
--- x要素
+{-| ベクトル座標が、右にあるかどうか
+
+    isRightPos (3, 10) (5, 3) == True
+ -}
+isRightPos : Vec -> Vec -> Bool
+isRightPos (bx, _) (x, _) = bx < x
+
+{-| ベクトル座標が左にあるかどうか
+
+    isLeftPos (6, 4) (2, 12) == True
+ -}
+isLeftPos : Vec -> Vec -> Bool
+isLeftPos (bx, _) (x, _) = bx > x
+
+{-| ベクトル座標が上にあるかどうか
+
+    isUpsidePos (4, 10) (1, 12) == True
+ -}
+isUpsidePos : Vec -> Vec -> Bool
+isUpsidePos (_, by) (_, y) = y > by
+
+{-| ベクトル座標が下にあるかどうか
+
+    isUpsidePos (4, 15) (1, 12) == True
+ -}
+isDownPos : Vec -> Vec -> Bool
+isDownPos (_, by) (_, y) = y < by
+
+{-| ベクトルのx要素を取得
+
+    getx (3, 5) == 3
+ -}
 getx = fst
-getw = fst
 
--- y要素
+{-| ベクトルのx要素を取得
+
+    getw (3, 5) == 3
+ -}
+ getw = fst
+
+{-| ベクトルのy要素を取得
+
+    gety (3, 5) == 5
+ -}
 gety = snd
-geth = snd
 
--- ベクトルをクランプする
+{-| ベクトルのy要素を取得
+
+    geth (3, 5) == 5
+ -}
+ geth = snd
+
+{-| ベクトルをクランプする
+
+    clampVec (0, 10) (100, 20) (-1, 15) == (0, 15)
+ -}
 clampVec (minX, minY) (maxX, maxY) (x, y) = (clamp minX maxX x, clamp minY maxY y)
 
 -- ================================================================
@@ -100,6 +166,9 @@ getSizeH rect = gety rect.size
 getArea : Rect -> Float
 getArea {size} = uncurry (*) size
 
+getRectCenter : Rect -> Vec
+getRectCenter {origin, size} = addVec origin <| multVec 0.5 size
+
 -- サイズゼロのレクト
 zeroRect : Rect
 zeroRect = { origin = (0.0, 0.0), size = (0.0, 0.0) }
@@ -116,8 +185,12 @@ moveRect mvec rect = { rect | origin <- addVec mvec rect.origin }
 resizeRect : Vec -> Rect -> Rect
 resizeRect newsize rect = { rect | size <- newsize }
 
--- レクト同士で重なり合っている部分を検出
--- @see http://noriok.hatenablog.com/entry/2012/02/19/233543
+{-| レクト同士で重なり合っている部分を検出
+    @see http://noriok.hatenablog.com/entry/2012/02/19/233543
+
+    getOverlapRect {origin=(0,0),size=(50,50)} {oring=(25,25),size=(30,30)} == Just {origin=(25,25),size=(5,5)}
+    getOverlapRect {origin=(0,0),size=(50,50)} {oring=(51,51),size=(30,30)} == Nothing
+ -}
 getOverlapRect : Rect -> Rect -> Maybe Rect
 getOverlapRect recta rectb =
     let

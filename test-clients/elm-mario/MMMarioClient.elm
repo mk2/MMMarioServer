@@ -71,7 +71,7 @@ port wsSendData = let sendData = (\gameState -> gameState.sendData)
 {--================================================================--}
 
 moveBlock delta blkRect mass baseSpd =
-    let massCoeff = (/) (getArea blkRect) mass
+    let massCoeff = (/) mass (getArea blkRect)
         moveStep = log "moveStep" <| multVec delta . multVec massCoeff <| baseSpd
     in moveRect moveStep blkRect
 
@@ -83,37 +83,37 @@ checkBlock blkRect =
         Nothing -> False
         _ -> True
 
+resolveCollision : Rect -> Rect -> Rect
+resolveCollision block crect =
+    let blkpos = block.origin
+        wider = (getSizeW block) > (getSizeH block)
+        ccen = getRectCenter crect
+    in if | wider && isUpsidePos ccen blkpos -> moveRect (0, -(getSizeH block)) crect
+          | wider && isDownPos ccen blkpos -> moveRect (0, getSizeH block) crect
+          | isLeftPos ccen blkpos -> moveRect (-(getSizeW block), 0) crect
+          | isRightPos ccen blkpos -> moveRect (getSizeW block, 0) crect
+          | otherwise -> crect
+
+resolveCollisions : [Rect] -> Chara -> Chara
+resolveCollisions blocks m =
+    let overlapRects = justs <| map (\r -> getOverlapRect r m.rect) blocks
+        newMrect = foldl (\r mrect -> resolveCollision r mrect) m.rect overlapRects
+    in if | length overlapRects == 0 ->  { m | rect <- newMrect }
+          | otherwise -> resolveCollisions overlapRects { m | rect <- newMrect }
+
 -- キャラクターの速度を計算
 -- 計算方法
 -- delta : t
-calcCharaSpd : Float -> Vec -> Vec -> Vec -> Bool -> Chara -> Chara
-calcCharaSpd delta moveStep fricStep gravityStep willJump m =
-    let
-        -- ジャンプできるかどうか
-        jumpable = willJump && m.isTouchOnDownBlock && not m.isTouchOnTopBlock
-
-    in if   -- ジャンプキーが押されてかつ地面に触れていた場合ジャンプ可能
-          | jumpable -> { m | spd <- marioJumpStep }
-
-            -- 地面に触れていない場合、移動できない
-          | not m.isTouchOnDownBlock -> { m | spd <- addVec fricStep gravityStep }
-
-            -- それ以外の場合（全ての加速度が現在の加速度にたされる）
-          | otherwise -> { m | spd <- addVec moveStep . addVec fricStep <| gravityStep }
+calcCharaSpd : Float -> Vec -> Vec -> Bool -> Chara -> Chara
+calcCharaSpd delta moveStep gravityStep willJump m = m
 
 -- キャラクターの位置を計算
 -- 速度で位置を計算し、その位置が適切なものならばそれに更新、違っているならそのまま
 calcCharaPos : GameState -> Float -> Chara -> Chara
-calcCharaPos gameState delta m =
-    let
-        -- 新しい位置を計算
-        (px, py) = addVec m.rect.origin <| multVec delta m.spd
-
-    in m
+calcCharaPos gameState delta m = m
 
 -- キャラクターのイメージを更新
-updateCharaImage m =
-    m
+updateCharaImage m = m
 
 -- ゲーム関数
 -- (更新秒, (矢印キー上下, 矢印キー左右), キーボード, WS受信データ, クライアント名, ウィンドウサイズ, ブロック) -> ゲームステート -> ゲームステート
@@ -124,17 +124,17 @@ stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRec
 
         moveSpd = vec (0, 10)
 
-        newBlks = filter checkBlock . map (\blkRect -> moveBlock delta blkRect 2000 moveSpd) <| gameState.blocks
+        newBlks = filter checkBlock . map (\blkRect -> moveBlock delta blkRect 20000 moveSpd) <| gameState.blocks
         blks = log "blks" <| length newBlks
 
-        -- 更新前のマリオ
-        --preMario = gameState.mario
+        -- 更新前の自キャラ
+        --preSelf = gameState.self
 
-        -- 移動加速度
-        --moveStep = multVec moveCoeff (toFloat arr.x, 0)
+        -- 移動速度
+        moveStep = multVec moveCoeff (toFloat arr.x, 0)
 
-        -- 摩擦加速度
-        --fricStep = multVec fricCoeff (negVec preMario.spd)
+        -- 新しい自キャラ位置の計算
+        --newSelf = updateCharaImage . calcCharaPos gameState delta . calcCharaSpd delta moveStep gravityStep preSelf
 
         -- 送信するマリオの位置情報
         {-- marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
@@ -148,6 +148,7 @@ stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRec
 
     in { gameState |
                      sendData <- ""
+                   , ellapsedSeconds <- gameState.ellapsedSeconds + delta
                    , otherCharas <- []
                    , clientName <- clientName
                    , blocks <- blkRect :: newBlks
