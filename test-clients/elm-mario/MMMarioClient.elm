@@ -85,16 +85,20 @@ checkBlock blkRect =
 
 {-| レクト同士の重なっている部分を解消する
  -}
-resolveCollision : Rect -> Rect -> Rect
-resolveCollision block crect =
+resolveCollision : Rect -> Chara -> Chara
+resolveCollision block m =
     let blkpos = block.origin
         wider = (getSizeW block) > (getSizeH block)
-        ccen = getRectCenter crect
-    in if | wider && isUpsidePos ccen blkpos -> moveRect (0, -(getSizeH block)) crect
-          | wider && isDownPos ccen blkpos -> moveRect (0, getSizeH block) crect
-          | isLeftPos ccen blkpos -> moveRect (-(getSizeW block), 0) crect
-          | isRightPos ccen blkpos -> moveRect (getSizeW block, 0) crect
-          | otherwise -> crect
+        ccen = getRectCenter m.rect
+    in if | wider && isUpsidePos ccen blkpos -> { m | rect <- moveRect (0, -(getSizeH block)) m.rect
+                                                    , isTouchOnUpsideBlock <- True }
+          | wider && isDownPos ccen blkpos -> { m | rect <- moveRect (0, getSizeH block) m.rect
+                                                  , isTouchOnDownBlock <- True }
+          | isLeftPos ccen blkpos -> { m | rect <- moveRect (-(getSizeW block), 0) m.rect
+                                         , isTouchOnLeftBlock <- True }
+          | isRightPos ccen blkpos -> { m | rect <- moveRect (getSizeW block, 0) m.rect
+                                          , isTouchOnRightBlock <- True }
+          | otherwise -> m
 
 {-| レクトとキャラの重なりをすべて解消する
     多分無限ループにはならない
@@ -102,9 +106,9 @@ resolveCollision block crect =
 resolveCollisions : [Rect] -> Chara -> Chara
 resolveCollisions blocks m =
     let overlapRects = justs <| map (\r -> getOverlapRect r m.rect) blocks
-        newMrect = foldl (\r mrect -> resolveCollision r mrect) m.rect overlapRects
-    in if | length overlapRects == 0 ->  { m | rect <- newMrect }
-          | otherwise -> resolveCollisions overlapRects { m | rect <- newMrect }
+        newM = foldl (\r mrect -> resolveCollision r m) m overlapRects
+    in if | length overlapRects == 0 ->  newM
+          | otherwise -> resolveCollisions overlapRects m
 
 -- キャラクターの速度を計算
 -- 計算方法
@@ -118,12 +122,17 @@ calcCharaSpd delta moveStep willJump m =
             -- それ以外の場合
           | otherwise -> { m | spd <- addVec moveStep . addVec (multVec delta gravityStep) <| m.spd }
 
--- キャラクターの位置を計算
--- 速度で位置を計算し、その位置が適切なものならばそれに更新、違っているならそのまま
+{-| キャラクターのいちを計算し、コリジョンを解消する
+    コリジョンの解消前に接触フラグを全てFalseにしておく
+ -}
 calcCharaPos : GameState -> Float -> Chara -> Chara
 calcCharaPos gameState delta m =
     let newPos = addVec m.rect.origin (multVec delta m.spd)
-    in resolveCollisions gameState.blocks { m | rect <- {origin = newPos, size = m.rect.size} }
+    in resolveCollisions gameState.blocks { m | rect <- {origin = newPos, size = m.rect.size}
+                                              , isTouchOnUpsideBlock <- False
+                                              , isTouchOnDownBlock <- False
+                                              , isTouchOnRightBlock <- False
+                                              , isTouchOnLeftBlock <- False }
 
 -- キャラクターのイメージを更新
 updateCharaImage m = m
