@@ -17,14 +17,23 @@ getImage chara (w, h) =
 render : (Int, Int) -> GameState -> Element
 render (screenWidth, screenHeight) gameState =
     let
+        -- 描画領域全体を移動するベクトル
         moveOriginVec = negVec . multVec 0.5 <| vec (screenWidth, screenHeight)
 
         -- クライアント名
         clientName = gameState.clientName
 
+        -- 自キャラ
+        selfForm = renderChara gameState.self
+
         blkForms = group . map renderBlock <| gameState.blocks
 
-    in collage screenWidth screenHeight <| [move moveOriginVec . group <| [blkForms]]
+    in collage screenWidth screenHeight <| [move moveOriginVec . group <| [blkForms, selfForm]]
+
+renderChara : Chara -> Form
+renderChara c =
+    let img = getImage c (marioImageWidth, marioImageHeight)
+    in move c.rect.origin . toForm <| img
 
 renderBlock : Rect -> Form
 renderBlock blkRect =

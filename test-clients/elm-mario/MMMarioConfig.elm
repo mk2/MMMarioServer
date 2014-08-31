@@ -19,7 +19,7 @@ gndColor = rgb 188 118 71
 linColor = rgb 200 200 200
 
 -- ゲームのFPS
-gameFps = 5
+gameFps = 0.5
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
@@ -84,14 +84,14 @@ initialGameState = {
                    , windowDims = (400, 400)
                    }
 
--- マリオのジャンプ移動速度
-marioJumpStep = (0, 2000)
+-- キャラのジャンプ移動速度
+jumpStep = (0.0, 2000.0)
 
 -- 重力加速度
-gravityStep = (0, -900)
+gravityStep = (0.0, -900.0)
 
 -- 摩擦係数
-fricCoeff = 10
+fricCoeff = 10.0
 
 -- マリオ移動加速度係数
-moveCoeff = 500
+moveCoeff = 500.0

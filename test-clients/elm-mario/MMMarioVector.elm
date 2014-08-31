@@ -129,7 +129,7 @@ getx = fst
 
     getw (3, 5) == 3
  -}
- getw = fst
+getw = fst
 
 {-| ベクトルのy要素を取得
 
@@ -141,7 +141,7 @@ gety = snd
 
     geth (3, 5) == 5
  -}
- geth = snd
+geth = snd
 
 {-| ベクトルをクランプする
 

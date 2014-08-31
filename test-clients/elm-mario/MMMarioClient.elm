@@ -83,6 +83,8 @@ checkBlock blkRect =
         Nothing -> False
         _ -> True
 
+{-| レクト同士の重なっている部分を解消する
+ -}
 resolveCollision : Rect -> Rect -> Rect
 resolveCollision block crect =
     let blkpos = block.origin
@@ -94,6 +96,9 @@ resolveCollision block crect =
           | isRightPos ccen blkpos -> moveRect (getSizeW block, 0) crect
           | otherwise -> crect
 
+{-| レクトとキャラの重なりをすべて解消する
+    多分無限ループにはならない
+ -}
 resolveCollisions : [Rect] -> Chara -> Chara
 resolveCollisions blocks m =
     let overlapRects = justs <| map (\r -> getOverlapRect r m.rect) blocks
@@ -104,13 +109,21 @@ resolveCollisions blocks m =
 -- キャラクターの速度を計算
 -- 計算方法
 -- delta : t
-calcCharaSpd : Float -> Vec -> Vec -> Bool -> Chara -> Chara
-calcCharaSpd delta moveStep gravityStep willJump m = m
+calcCharaSpd : Float -> Vec -> Bool -> Chara -> Chara
+calcCharaSpd delta moveStep willJump m =
+    let -- ジャンプできるかどうか
+        jumpable = willJump && m.isTouchOnDownBlock && not m.isTouchOnUpsideBlock
+    in if   -- ジャンプ可能な場合
+          | jumpable -> { m | spd <- addVec m.spd jumpStep }
+            -- それ以外の場合
+          | otherwise -> { m | spd <- addVec moveStep . addVec (multVec delta gravityStep) <| m.spd }
 
 -- キャラクターの位置を計算
 -- 速度で位置を計算し、その位置が適切なものならばそれに更新、違っているならそのまま
 calcCharaPos : GameState -> Float -> Chara -> Chara
-calcCharaPos gameState delta m = m
+calcCharaPos gameState delta m =
+    let newPos = addVec m.rect.origin (multVec delta m.spd)
+    in resolveCollisions gameState.blocks { m | rect <- {origin = newPos, size = m.rect.size} }
 
 -- キャラクターのイメージを更新
 updateCharaImage m = m
@@ -120,21 +133,16 @@ updateCharaImage m = m
 stepGame : (Float, {x : Int, y : Int}, Bool, String, String, (Int, Int), Rect) -> GameState -> GameState
 stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRect) gameState =
     let
-        d = log "blkRect" <| blkRect
-
+        -- ブロックの移動速度
         moveSpd = vec (0, 10)
 
         newBlks = filter checkBlock . map (\blkRect -> moveBlock delta blkRect 20000 moveSpd) <| gameState.blocks
-        blks = log "blks" <| length newBlks
-
-        -- 更新前の自キャラ
-        --preSelf = gameState.self
 
         -- 移動速度
         moveStep = multVec moveCoeff (toFloat arr.x, 0)
 
         -- 新しい自キャラ位置の計算
-        --newSelf = updateCharaImage . calcCharaPos gameState delta . calcCharaSpd delta moveStep gravityStep preSelf
+        newSelf = log "self" <| updateCharaImage . calcCharaPos gameState delta . calcCharaSpd delta moveStep space <| gameState.self
 
         -- 送信するマリオの位置情報
         {-- marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
@@ -149,6 +157,7 @@ stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRec
     in { gameState |
                      sendData <- ""
                    , ellapsedSeconds <- gameState.ellapsedSeconds + delta
+                   , self <- newSelf
                    , otherCharas <- []
                    , clientName <- clientName
                    , blocks <- blkRect :: newBlks
