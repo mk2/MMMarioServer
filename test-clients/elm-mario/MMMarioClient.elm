@@ -93,10 +93,11 @@ resolveCollision block m =
     in if | wider && isUpsidePos ccen blkpos -> { m | rect <- moveRect (0, -(getSizeH block)) m.rect
                                                     , isTouchOnUpsideBlock <- True }
           | wider && isDownPos ccen blkpos -> { m | rect <- moveRect (0, getSizeH block) m.rect
-                                                  , isTouchOnDownBlock <- True }
-          | isLeftPos ccen blkpos -> { m | rect <- moveRect (-(getSizeW block), 0) m.rect
+                                                  , isTouchOnDownBlock <- True
+                                                  , spd <- (getx m.spd, 0.0) }
+          | isLeftPos ccen blkpos -> { m | rect <- moveRect (getSizeW block, 0) m.rect
                                          , isTouchOnLeftBlock <- True }
-          | isRightPos ccen blkpos -> { m | rect <- moveRect (getSizeW block, 0) m.rect
+          | isRightPos ccen blkpos -> { m | rect <- moveRect (-(getSizeW block), 0) m.rect
                                           , isTouchOnRightBlock <- True }
           | otherwise -> m
 
@@ -105,10 +106,9 @@ resolveCollision block m =
  -}
 resolveCollisions : [Rect] -> Chara -> Chara
 resolveCollisions blocks m =
-    let overlapRects = justs <| map (\r -> getOverlapRect r m.rect) blocks
-        newM = foldl (\r mrect -> resolveCollision r m) m overlapRects
-    in if | length overlapRects == 0 ->  newM
-          | otherwise -> resolveCollisions overlapRects m
+    let overlapRects = log "rect" <| justs <| map (\r -> getOverlapRect r m.rect) blocks
+        newM = foldl (\r m -> resolveCollision r m) m <| overlapRects
+    in { newM | rect <- clampRect minPos maxPos newM.rect }
 
 -- キャラクターの速度を計算
 -- 計算方法
@@ -125,14 +125,15 @@ calcCharaSpd delta moveStep willJump m =
 {-| キャラクターのいちを計算し、コリジョンを解消する
     コリジョンの解消前に接触フラグを全てFalseにしておく
  -}
-calcCharaPos : GameState -> Float -> Chara -> Chara
-calcCharaPos gameState delta m =
+calcCharaPos : [Rect] -> Float -> Chara -> Chara
+calcCharaPos blocks delta m =
     let newPos = addVec m.rect.origin (multVec delta m.spd)
-    in resolveCollisions gameState.blocks { m | rect <- {origin = newPos, size = m.rect.size}
-                                              , isTouchOnUpsideBlock <- False
-                                              , isTouchOnDownBlock <- False
-                                              , isTouchOnRightBlock <- False
-                                              , isTouchOnLeftBlock <- False }
+    in resolveCollisions blocks { m | rect <- {origin = newPos, size = m.rect.size}
+                                      , isTouchOnUpsideBlock <- False
+                                      , isTouchOnDownBlock <- False
+                                      , isTouchOnRightBlock <- False
+                                      , isTouchOnLeftBlock <- False
+                                      , spd <- (0.0, gety m.spd) }
 
 -- キャラクターのイメージを更新
 updateCharaImage m = m
@@ -151,7 +152,7 @@ stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRec
         moveStep = multVec moveCoeff (toFloat arr.x, 0)
 
         -- 新しい自キャラ位置の計算
-        newSelf = log "self" <| updateCharaImage . calcCharaPos gameState delta . calcCharaSpd delta moveStep space <| gameState.self
+        newSelf = updateCharaImage . calcCharaPos newBlks delta . calcCharaSpd delta moveStep space <| gameState.self
 
         -- 送信するマリオの位置情報
         {-- marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
@@ -163,14 +164,22 @@ stepGame (delta, arr, space, recvData, clientName, (winWidth, winHeight), blkRec
         cnvToFloat = \[name, strX, strY] -> (name, (maybeFloat strX, maybeFloat strY))
         otherCharas = log "otherCharas" <| zip [1 .. numCharas] <| map cnvToFloat <| takeCycle 3 poss --}
 
-    in { gameState |
-                     sendData <- ""
-                   , ellapsedSeconds <- gameState.ellapsedSeconds + delta
-                   , self <- newSelf
-                   , otherCharas <- []
-                   , clientName <- clientName
-                   , blocks <- blkRect :: newBlks
-                   , windowDims <- (winWidth, winHeight) }
+    in if | gameState.blockGenInterval > 2.0 -> { gameState | sendData <- ""
+                                                            , ellapsedSeconds <- gameState.ellapsedSeconds + delta
+                                                            , self <- newSelf
+                                                            , otherCharas <- []
+                                                            , clientName <- clientName
+                                                            , blockGenInterval <- 0.0
+                                                            , blocks <- blkRect :: newBlks
+                                                            , windowDims <- (winWidth, winHeight) }
+          | otherwise -> { gameState | sendData <- ""
+                                     , ellapsedSeconds <- gameState.ellapsedSeconds + delta
+                                     , self <- newSelf
+                                     , otherCharas <- []
+                                     , clientName <- clientName
+                                     , blockGenInterval <- gameState.blockGenInterval + delta
+                                     , blocks <- newBlks
+                                     , windowDims <- (winWidth, winHeight) }
 
 -- ディスプレイ関数
 -- (ウィンドウサイズ) -> ゲームステート -> Element

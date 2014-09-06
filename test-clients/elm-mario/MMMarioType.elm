@@ -27,6 +27,7 @@ type Chara = {
 type GameState = {
                    self : Chara
                  , ellapsedSeconds : Float
+                 , blockGenInterval : Float
                  , blocks : [Rect]
                  , stageSize : Vec
                  , otherCharas : [(Int, (String, Vec))]

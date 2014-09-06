@@ -185,6 +185,11 @@ moveRect mvec rect = { rect | origin <- addVec mvec rect.origin }
 resizeRect : Vec -> Rect -> Rect
 resizeRect newsize rect = { rect | size <- newsize }
 
+{-| レクトをベクトルでクランプ
+ -}
+clampRect : Vec -> Vec -> Rect -> Rect
+clampRect minPos maxPos r = { r | origin <- clampVec minPos maxPos r.origin }
+
 {-| レクト同士で重なり合っている部分を検出
     @see http://noriok.hatenablog.com/entry/2012/02/19/233543
 

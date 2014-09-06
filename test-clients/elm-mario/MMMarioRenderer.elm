@@ -33,12 +33,13 @@ render (screenWidth, screenHeight) gameState =
 renderChara : Chara -> Form
 renderChara c =
     let img = getImage c (marioImageWidth, marioImageHeight)
-    in move c.rect.origin . toForm <| img
+        v = addVec c.rect.origin <| multVec 0.5 c.rect.size
+    in move v . toForm <| img
 
 renderBlock : Rect -> Form
 renderBlock blkRect =
-    let
-        linSt = solid linColor
+    let linSt = solid linColor
         w = getSizeW blkRect
         h = getSizeH blkRect
-    in move blkRect.origin . outlined linSt <| rect w h
+        v = addVec blkRect.origin <| multVec 0.5 blkRect.size
+    in move v . outlined linSt <| rect w h

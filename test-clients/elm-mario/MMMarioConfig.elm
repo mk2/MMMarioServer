@@ -19,7 +19,7 @@ gndColor = rgb 188 118 71
 linColor = rgb 200 200 200
 
 -- ゲームのFPS
-gameFps = 0.5
+gameFps = 60
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
@@ -37,7 +37,7 @@ resourceBaseUrl = "resources/"
 imageBaseUrl = resourceBaseUrl ++ "images/"
 
 -- 最大位置
-maxPos = (640, 640)
+maxPos = vec (640, 640)
 minPos = zeroVec
 
 maxBlockSizeWidth = 150
@@ -70,14 +70,15 @@ defaultChara = {
 -- ゲームの初期状態
 initialGameState : GameState
 initialGameState = {
-                     self = { defaultChara | rect <- { origin = (0, 100), size = (20, 32) }
+                     self = { defaultChara | rect <- { origin = (300, 500), size = (20, 32) }
                                            , imageBaseName <- "mario"
                                            , imagePoseName <- "stand"
                                            , imageDireName <- "right"
                                            }
                    , sendData = ""
                    , ellapsedSeconds = 0.0
-                   , blocks = []
+                   , blockGenInterval = 0.0
+                   , blocks = [{origin = zeroVec, size = vec (640, 100)}]
                    , otherCharas = []
                    , clientName = ""
                    , stageSize = (400, 400)
@@ -85,13 +86,13 @@ initialGameState = {
                    }
 
 -- キャラのジャンプ移動速度
-jumpStep = (0.0, 2000.0)
+jumpStep = (0.0, 200.0)
 
 -- 重力加速度
-gravityStep = (0.0, -900.0)
+gravityStep = (0.0, -400.0)
 
 -- 摩擦係数
 fricCoeff = 10.0
 
 -- マリオ移動加速度係数
-moveCoeff = 500.0
+moveCoeff = 100.0
