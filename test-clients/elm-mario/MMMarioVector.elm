@@ -84,6 +84,26 @@ dotVec (x, y) (ax, ay) = x * ay + y * ax
 negVec : Vec -> Vec
 negVec (x, y) = (-x, -y)
 
+{-| ベクトルのX要素だけ反転
+ -}
+negxVec : Vec -> Vec
+negxVec (x, y) = (-x, y)
+
+{-| ベクトルのY要素だけ反転
+ -}
+negyVec : Vec -> Vec
+negyVec (x, y) = (x, -y)
+
+{-| ベクトルのX要素をゼロ化して返す
+ -}
+zeroxVec : Vec -> Vec
+zeroxVec (x, y) = (0.0, y)
+
+{-| ベクトルのY要素をゼロ化して返す
+ -}
+zeroyVec : Vec -> Vec
+zeroyVec (x, y) = (x, 0.0)
+
 {-| ベクトルの長さを求める
 
     lenVec (1, 1) == 1.4...
