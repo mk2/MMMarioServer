@@ -166,27 +166,23 @@ stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, win
         newSelf = updateCharaImage . calcCharaPos newBlks delta . calcCharaSpd delta moveStep shift space <| gameState.self
 
         -- 送信するマリオの位置情報
-        {-- marioPosStr = "M" ++ (show . absRound . getx <| newMario.pos) ++ "," ++ (show . absRound . gety <| newMario.pos)
+        sendData = convPosToSend newSelf
 
-        -- 別キャラの位置
-        poss = split "," recvData
-        numCharas = (length poss) `div` 2
-        maybeFloat = maybe 0.0 (\n -> n) . S.toFloat
-        cnvToFloat = \[name, strX, strY] -> (name, (maybeFloat strX, maybeFloat strY))
-        otherCharas = log "otherCharas" <| zip [1 .. numCharas] <| map cnvToFloat <| takeCycle 3 poss --}
+        -- 別キャラの
+        otherCharas = convRecvToCharas recvData
 
-    in if | gameState.blockGenInterval > 2.0 -> { gameState | sendData <- ""
+    in if | gameState.blockGenInterval > 2.0 -> { gameState | sendData <- sendData
                                                             , ellapsedSeconds <- gameState.ellapsedSeconds + delta
                                                             , self <- newSelf
-                                                            , otherCharas <- []
+                                                            , otherCharas <- otherCharas
                                                             , clientName <- clientName
                                                             , blockGenInterval <- 0.0
                                                             , blocks <- blkRect :: newBlks
                                                             , windowDims <- (winWidth, winHeight) }
-          | otherwise -> { gameState | sendData <- ""
+          | otherwise -> { gameState | sendData <- sendData
                                      , ellapsedSeconds <- gameState.ellapsedSeconds + delta
                                      , self <- newSelf
-                                     , otherCharas <- []
+                                     , otherCharas <- otherCharas
                                      , clientName <- clientName
                                      , blockGenInterval <- gameState.blockGenInterval + delta
                                      , blocks <- newBlks
