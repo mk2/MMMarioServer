@@ -75,7 +75,7 @@ port wsSendData = let sendData = (\gameState -> gameState.sendData)
 
 moveBlock delta blkRect mass baseSpd =
     let massCoeff = (/) mass (getArea blkRect)
-        moveStep = log "moveStep" <| multVec delta . multVec massCoeff <| baseSpd
+        moveStep = multVec delta . multVec massCoeff <| baseSpd
     in moveRect moveStep blkRect
 
 stageRect = { origin = zeroVec, size = vec (stageWidth, stageHeight) }
@@ -108,7 +108,6 @@ resolveCollision block m =
           | otherwise -> m
 
 {-| レクトとキャラの重なりをすべて解消する
-    多分無限ループにはならない
  -}
 resolveCollisions : [Rect] -> Chara -> Chara
 resolveCollisions blocks m =
@@ -169,7 +168,8 @@ stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, win
         sendData = convPosToSend newSelf
 
         -- 別キャラの
-        otherCharas = convRecvToCharas recvData
+        -- otherCharas = convRecvToCharas recvData
+        otherCharas = []
 
     in if | gameState.blockGenInterval > 2.0 -> { gameState | sendData <- sendData
                                                             , ellapsedSeconds <- gameState.ellapsedSeconds + delta

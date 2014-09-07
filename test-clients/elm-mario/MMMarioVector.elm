@@ -208,7 +208,14 @@ resizeRect newsize rect = { rect | size <- newsize }
 {-| レクトをベクトルでクランプ
  -}
 clampRect : Vec -> Vec -> Rect -> Rect
-clampRect minPos maxPos r = { r | origin <- clampVec minPos maxPos r.origin }
+clampRect minPos maxPos r =
+    let ev = addVec r.origin r.size
+        isUpside = isUpsidePos maxPos ev
+        isRight = isRightPos maxPos ev
+    in if | isUpside && isRight -> { r | origin <- subVec maxPos r.size }
+          | isUpside && not isRight -> { r | origin <- ((getx r.origin), ((gety maxPos - gety r.size))) }
+          | not isUpside && isRight -> { r | origin <- (((getx maxPos - getx r.size)), (gety r.origin)) }
+          | otherwise -> { r | origin <- clampVec minPos maxPos r.origin }
 
 {-| レクト同士で重なり合っている部分を検出
     @see http://noriok.hatenablog.com/entry/2012/02/19/233543
