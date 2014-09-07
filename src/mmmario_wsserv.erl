@@ -134,7 +134,7 @@ handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
   mmmario:move_player(PPid, Args),
   {noreply, S};
 
-%% eventメッセージをハンドリンg
+%% eventメッセージをハンドリング
 %% nameイベント
 handle_cast({event, {name, Name}}, S = #wsservstate{ppid = PPid}) ->
   io:format("name request~n"),
@@ -174,8 +174,8 @@ handle_cast(
   Data = WSDataFrame#wsdataframe.data,
   io:format("dataframe: ~p~n", [WSDataFrame]),
   io:format("text data received: ~p~n", [Data]),
-  Event = mmmario_event_helper:text_to_event(binary:bin_to_list(Data)),
-  gen_server:cast(self(), {event, Event}), % イベントに変換後、wsserv内で処理する
+  Events = mmmario_event_helper:text_to_events(binary:bin_to_list(Data)), % イベントに変換したあと全部投げる
+  [gen_server:cast(self(), {event, Event}) || Event <- Events],
   {noreply, S};
 
 %% クローズメッセージを処理

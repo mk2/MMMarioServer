@@ -31,6 +31,8 @@
 
 -record(evtstate, {}).
 
+-include("mmmario_type.hrl").
+
 %%%===================================================================
 %%% 公開APIs
 %%%===================================================================
@@ -70,7 +72,7 @@ handle_event({update_chara_pos, SenderPPid, Name, {X, Y}}, S) ->
       [mmmario_wsserv:send(WSServPid, Str) || WSServPid <- mmmario_wsserv_sup:childPids()];
     _ -> ok
   end,
-  io:format("character positions (except event fire process): ~p~n", [CharaPos]),
+  io:format("character positions: ~p~n", [CharaPos]),
   {ok, S};
 
 %% キャラの削除イベントを受け取る
@@ -85,7 +87,7 @@ handle_event({delete_chara, SenderPPid}, S) ->
       [mmmario_wsserv:send(WSServPid, Str) || WSServPid <- mmmario_wsserv_sup:childPids()];
     _ -> ok
   end,
-  io:format("character positions (except event fire process): ~p~n", [CharaPos]),
+  io:format("character positions: ~p~n", [CharaPos]),
   {ok, S};
 
 handle_event(_Event, S) ->

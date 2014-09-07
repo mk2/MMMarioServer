@@ -10,8 +10,13 @@
 -author("lycaon").
 
 %% API
--export([text_to_event/1, pos_list_to_binary/1]).
+-export([text_to_events/1, text_to_event/1, pos_list_to_binary/1]).
 -compile([export_all]).
+
+%% XXXX|XXXX というような文字列をイベントリストに変換する
+%% XXXXはイベント
+text_to_events(RawText) ->
+  lists:map(fun(Txt) -> text_to_event(Txt) end, string:tokens(RawText, "|")).
 
 %% 移動コマンドをイベントに変換
 %% ex: "M1000,1000"
@@ -22,6 +27,16 @@ text_to_event("M" ++ RawText) ->
   io:format("X: ~p Y: ~p~n", [X, Y]),
   {move, {X, Y}};
 
+%% 新規ブロック生成イベント
+%% ex: "B0,0,100,100" (0,0)に大きさ(100,100)のブロックを生成
+text_to_event("b" ++ RawText) ->
+  text_to_event("B" ++ RawText);
+text_to_event("B" ++ RawText) ->
+  [{X, _}, {Y, _}, {W, _}, {H, _} | _] = lists:map(fun(Txt) -> string:to_integer(Txt) end, string:tokens(RawText, ",")),
+  io:format("X: ~p Y: ~p W: ~p H: ~p~n", [X, Y, W, H]),
+  {block, {X, Y, W, H}};
+
+
 %% 名前登録、クライアントの名前を登録する
 %% ex: "N1203120"
 text_to_event("n" ++ RawText) ->
@@ -30,7 +45,8 @@ text_to_event("N" ++ RawText) ->
   {name, RawText};
 
 text_to_event(RawText) ->
-  io:format("unknown command contained: ~p~n", [RawText]).
+  error_logger:format("unknown command contained: ~p~n", [RawText]),
+  undefined.
 
 %% 位置配列[{X, Y}, {X, Y} ... ]を文字列化する
 %%
