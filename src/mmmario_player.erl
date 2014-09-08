@@ -70,7 +70,7 @@ change_player_name(PPid, Name) ->
 %% 初期化
 %% 初期化後はidle状態にしてプレイヤーからのイベントを待つ
 init([WSServPid, Name]) ->
-  HandlerId = mmmario_event_handler:add_handler(),
+  HandlerId = mmmario_game_event_handler:add_handler(),
   process_flag(trap_exit, true),
   link(WSServPid),
   {ok, move, #pstate{wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
@@ -79,7 +79,7 @@ init([WSServPid, Name]) ->
 %% moveイベントが来たらmove状態へ移動
 move({move, {X, Y}}, S = #pstate{name = Name}) ->
   io:format("new posX: ~p posY: ~p~n", [X, Y]),
-  mmmario_event_handler:notify({update_chara_pos, self(), Name, {X, Y}}),
+  mmmario_game_event_handler:notify({update_chara_pos, self(), Name, {X, Y}}),
   {next_state, move, S#pstate{pos = {X, Y}}}.
 
 %% 名前書き換え
@@ -96,7 +96,7 @@ handle_info(_Info, SName, S) ->
 
 terminate(Reason, _SName, #pstate{}) ->
   io:format("terminating player with: ~p~n", [Reason]),
-  mmmario_event_handler:notify({delete_chara, self()}),
+  mmmario_game_event_handler:notify({delete_chara, self()}),
   ok.
 
 code_change(_OldVsn, SName, S, _Extra) ->

@@ -4,9 +4,9 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 17. 8 2014 15:45
+%%% Created : 08. 9 2014 23:44
 %%%-------------------------------------------------------------------
--module(mmmario_sup).
+-module(mmmario_room_sup).
 -author("lycaon").
 
 -behaviour(supervisor).
@@ -23,6 +23,11 @@
 %%% API functions
 %%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
@@ -30,26 +35,27 @@ start_link() ->
 %%% Supervisor callbacks
 %%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
 init([]) ->
-  RestartStrategy = one_for_one,
+  RestartStrategy = simple_one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
 
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
-  Restart = permanent,
+  Restart = temporary,
   Shutdown = 2000,
+  Type = worker,
 
-  PlayerSup = {mmmario_player_sup, {mmmario_player_sup, start_link, []},
-    Restart, Shutdown, supervisor, [mmmario_player_sup]},
+  AChild = {mmmario_room, {mmmario_room, start_link, []},
+    Restart, Shutdown, Type, [mmmario_room]},
 
-  WSServSup = {mmmario_wsserv_sup, {mmmario_wsserv_sup, start_link, []},
-    Restart, Shutdown, supervisor, [mmmario_wsserv_sup]},
-
-  EvtMgr = {{local, mmmario_game_event_handler}, {mmmario_game_event_handler, start_link, []},
-    Restart, Shutdown, supervisor, [mmmario_event_handler]},
-
-  {ok, {SupFlags, [PlayerSup, WSServSup, EvtMgr]}}.
+  {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================
 %%% Internal functions

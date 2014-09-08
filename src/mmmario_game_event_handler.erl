@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 17. 8 2014 18:16
 %%%-------------------------------------------------------------------
--module(mmmario_event_handler).
+-module(mmmario_game_event_handler).
 -author("lycaon").
 
 -behaviour(gen_event).
@@ -29,9 +29,9 @@
 
 -define(SERVER, ?MODULE).
 
--record(evtstate, {}).
+-record(gevtstate, {}).
 
--include("mmmario_type.hrl").
+-include("mmmario_game_type.hrl").
 
 %%%===================================================================
 %%% 公開APIs
@@ -58,7 +58,7 @@ notify(Event) ->
 
 init([]) ->
   ?MODULE = ets:new(?MODULE, [set, named_table]),
-  {ok, #evtstate{}}.
+  {ok, #gevtstate{}}.
 
 %% キャラの位置更新イベントを受け取る
 %% 受け取ったら全キャラの位置情報を取得し、一斉にクライアントに投げる。微妙？
