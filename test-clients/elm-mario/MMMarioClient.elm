@@ -47,11 +47,11 @@ inputSignal = let delta = inSeconds <~ fps gameFps
                   genKeys = \arrows space shift keyF -> (arrows, space, shift, keyF)
                   keysSignal = genKeys <~ Keyboard.arrows ~ Keyboard.space ~ Keyboard.shift ~ fIsDown
                   keySignal = (,,,,,) <~ delta
-                                        ~ keysSignal
-                                        ~ wsRecvData
-                                        ~ clientName
-                                        ~ Window.dimensions
-                                        ~ blockSignal
+                                       ~ keysSignal
+                                       ~ wsRecvData
+                                       ~ clientName
+                                       ~ Window.dimensions
+                                       ~ blockSignal
               in sampleOn delta keySignal
 
 -- ゲーム状態のシグナル
