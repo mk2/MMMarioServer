@@ -54,10 +54,19 @@
 -define(MAX_UNSIGNED_INTEGER_16, 65532).
 -define(MAX_UNSIGNED_INTEGER_64, 9223372036854775807).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% handle_infoで楽にTCPパケットを受け取るためのマクロ
+%% @end
+%%--------------------------------------------------------------------
 -define(SOCK(Msg), {tcp, _Port, Msg}).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% WebSocketのデータフレームを格納するレコード
+%% 詳しくはRFC6455
+%% @end
+%%--------------------------------------------------------------------
 -record(wsdataframe, {
   fin = ?FIN_OFF,
   rsv1 = ?RSV_OFF, rsv2 = ?RSV_OFF, rsv3 = ?RSV_OFF,
@@ -69,7 +78,11 @@
   msg
 }).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% wsserveの状態
+%% @end
+%%--------------------------------------------------------------------
 -record(wsservstate, {
   lsock,
   csock,
@@ -77,36 +90,56 @@
   wsdataframe = #wsdataframe{}
 }).
 
-%%%-------------------------------------------------------------------
+%%%===================================================================
 %%% 公開API
-%%%-------------------------------------------------------------------
+%%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 開始メソッド。supervisorから起動される。ListenSocketはsupervisorから受け取る
+%% @end
+%%--------------------------------------------------------------------
 start_link(LSock) ->
   gen_server:start_link(?MODULE, LSock, []).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% データ送信メソッド
+%% @end
+%%--------------------------------------------------------------------
 send(Pid, Data) ->
   gen_server:cast(Pid, {data, Data}).
 
-%%%-------------------------------------------------------------------
+%%%===================================================================
 %%% gen_server コールバック
-%%%-------------------------------------------------------------------
+%%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
 %% gen_serverコールバック
-%% accept処理をここでやらずにcastしてるのは、accept処理中はポーリング状態になるため。{ok, _}をすぐに返さないと怒られる希ガス
+%% accept処理をここでやらずに外部プロセスからキャストしてるので、ブロックを防ぐため
+%% @end
+%%--------------------------------------------------------------------
 init(LSock) ->
   process_flag(trap_exit, true),
-  gen_server:cast(self(), accept),
+  spawn(fun() -> gen_server:cast(self(), accept) end),
   {ok, #wsservstate{lsock = LSock}}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 同期呼び出し
 %% 今のところ使う予定はないが、内部的にwsservを呼ぶときに使ったほうがよい？
+%% @end
+%%--------------------------------------------------------------------
 handle_call(_Request, _From, State) ->
   {ok, State}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 正常なメッセージを裁く関数
 %% ここからメッセージハンドラに流していく
+%% @end
+%%--------------------------------------------------------------------
 handle_info(?SOCK(Msg), S = #wsservstate{csock = CSock}) ->
   WSDataFrame = decode_ws_dataframe(Msg),
   io:format("received dataframe: ~p~n", [WSDataFrame]),
@@ -114,42 +147,64 @@ handle_info(?SOCK(Msg), S = #wsservstate{csock = CSock}) ->
   inet:setopts(CSock, [{active, once}]),
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% エラー処理
 %% といっても終了するだけ
+%% @end
+%%--------------------------------------------------------------------
 handle_info({tcp_closed, _CSock}, S = #wsservstate{}) ->
   {stop, normal, S};
 handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
   {stop, normal, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 未知のメッセージ処理
 %% 無視して別のメッセージを待つ
+%% @end
+%%--------------------------------------------------------------------
 handle_info(Msg, S) ->
   error_logger:format("unexpected msg: ~p~n", [Msg]),
   {noreply, S}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% eventメッセージをハンドリング
 %% moveイベント
+%% @end
+%%--------------------------------------------------------------------
 handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
   io:format("move request~n"),
   mmmario:move_player(PPid, Args),
   {noreply, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% eventメッセージをハンドリング
 %% nameイベント
+%% @end
+%%--------------------------------------------------------------------
 handle_cast({event, {name, Name}}, S = #wsservstate{ppid = PPid}) ->
   io:format("name request~n"),
   mmmario:change_player_name(PPid, Name),
   {noreply, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 未知のイベントをハンドリング
-%%
+%% @end
+%%--------------------------------------------------------------------
 handle_cast({event, _Unkonwn}, S = #wsservstate{}) ->
   io:format("unknown event request: ~p~n", [_Unkonwn]),
   {noreply, S};
 
-
+%%--------------------------------------------------------------------
+%% @doc
 %% TCPアクセプトを処理する関数
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   io:format("waiting for connection.~n"),
   {ok, CSock} = gen_tcp:accept(LSock),
@@ -164,9 +219,13 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
     _ -> {stop, "failed handshake with unknown reason", S}
   end;
 
+%%--------------------------------------------------------------------
+%% @doc
 %% テキストメッセージを処理
 %% こっから全てのイベントの処理が始まる…
 %% アクティブモード onceはあまりよろしくない？
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
     S = #wsservstate{csock = CSock}
@@ -178,8 +237,12 @@ handle_cast(
   [gen_server:cast(self(), {event, Event}) || Event <- Events],
   {noreply, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% クローズメッセージを処理
 %% Socketはterminateの方で閉じる？
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
     S = #wsservstate{csock = CSock}
@@ -188,8 +251,12 @@ handle_cast(
   gen_tcp:close(CSock),
   {stop, close_request, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% PINGメッセージを処理
 %% PONGを返す
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
     S = #wsservstate{csock = CSock}
@@ -198,8 +265,11 @@ handle_cast(
   gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})),
   {noreply, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 扱わないOPCODEの場合
-%%
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
     S = #wsservstate{}
@@ -207,8 +277,12 @@ handle_cast(
   error_logger:format("no handler for: ~p~n", [WSDataFrame]),
   {noreply, S};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 任意のデータ送信。send/2経由で使う
 %% 今のところOpCodeはTEXTになる
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(
     {data, Data},
     S = #wsservstate{csock = CSock}
@@ -218,30 +292,45 @@ handle_cast(
   gen_tcp:send(CSock, WSDataFrame),
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
+%%--------------------------------------------------------------------
+%% @doc
 %% fallback用handle_cast
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(Others, S) ->
   io:format("unexpected casting: ~p~n", [Others]),
   io:format("wsserv state: ~p~n", [S]),
   {noreply, S}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
+%% @end
+%%--------------------------------------------------------------------
 terminate(Reason, #wsservstate{csock = CSock, ppid = PPid}) ->
   io:format("terminating wsserv with: ~p~n", [Reason]),
   gen_tcp:close(CSock),
   mmmario:exit_player(PPid),
   ok.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% gen_serverコールバック
-%%
+%% @end
+%%--------------------------------------------------------------------
 code_change(OldVsn, State, Extra) ->
   erlang:error(not_implemented).
 
-%%%-------------------------------------------------------------------
-%%% 内部的に使う関数
-%%%-------------------------------------------------------------------
+%%%===================================================================
+%%% プライベート関数
+%%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
 %% ハンドシェイク処理
+%% @end
+%%--------------------------------------------------------------------
 do_handshake(CSock, Headers) ->
   case gen_tcp:recv(CSock, 0) of
     {ok, {http_request, _Method, {abs_path, Path}, _Version}} ->
@@ -260,8 +349,12 @@ do_handshake(CSock, Headers) ->
       {stop, unknown_header, [{headers, Headers}, {msg, Others}]}
   end.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% ヘッダー情報をまるっと受け取ったらここでヘッダーの内容をチェックし、大丈夫ならsend_handshakeを呼び出して
 %% openingハンドシェイクを送信する
+%% @end
+%%--------------------------------------------------------------------
 verify_handshake(CSock, Headers) ->
   io:format("Headers: ~p~n", [Headers]),
   catch true = string:equal("websocket", string:to_lower(maps:get({http_field, 'Upgrade'}))),
@@ -270,14 +363,22 @@ verify_handshake(CSock, Headers) ->
   catch {ok, _} = maps:find({http_field, "Sec-Websocket-Key"}, Headers),
   send_handshake(CSock, Headers).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% openingハンドシェイクを送信する
+%% @end
+%%--------------------------------------------------------------------
 send_handshake(CSock, Headers) ->
   SWKey = maps:get({http_field, "Sec-Websocket-Key"}, Headers),
   AcceptHeaderValue = make_accept_header_value(SWKey),
   AcceptHeader = ?WEBSOCKET_PREFIX ++ AcceptHeaderValue ++ "\r\n\r\n",
   gen_tcp:send(CSock, AcceptHeader).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% websocketのアクセプトヘッダの値を作る
+%% @end
+%%--------------------------------------------------------------------
 make_accept_header_value(SWKey) ->
   % WEBSOCKET_APPEND_TO_KEYを後ろに連結
   NewKey = SWKey ++ ?WEBSOCKET_APPEND_TO_KEY,
@@ -286,7 +387,11 @@ make_accept_header_value(SWKey) ->
   % base64で符号化
   base64:encode_to_string(Digest).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% websocketのデータフレームをデコード
+%% @end
+%%--------------------------------------------------------------------
 decode_ws_dataframe(RawMsg) ->
   <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, OpCode:4, Mask:1, PayloadLen:7, RemainMsg/binary>> = RawMsg,
 
@@ -336,8 +441,12 @@ decode_ws_dataframe(RawMsg) ->
   end.
 
 
+%%--------------------------------------------------------------------
+%% @doc
 %% データをwebsocketのデータフレームへエンコード
-% とりあえずデータは1メッセージに収まるという想定
+%% とりあえずデータは1メッセージに収まるという想定
+%% @end
+%%--------------------------------------------------------------------
 encode_ws_dataframe(Data, Opts) ->
   DataByteSize = byte_size(Data),
   FinRsvsOpCode = case maps:find(opcode, Opts) of
@@ -384,26 +493,42 @@ encode_ws_dataframe(Data, Opts) ->
     true -> erlang:error(unknown_payload_length)
   end.
 
-%%%-------------------------------------------------------------------
+%%%===================================================================
 %%% WebSocket用ユーティリティ関数
-%%%-------------------------------------------------------------------
+%%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
 %% マスクキーの抽出
+%% @end
+%%--------------------------------------------------------------------
 extract_mask_key(RawMsg) ->
   <<MaskKey:4/binary-unit:8, RemainMsg/binary>> = RawMsg,
   {MaskKey, RemainMsg}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 16ビット分のペイロード長を抽出
+%% @end
+%%--------------------------------------------------------------------
 extract_extend_payload_length_16(RawMsg) ->
   <<Length:16/unsigned-integer, RemainMsg/binary>> = RawMsg,
   {Length, RemainMsg}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% 64ビット分のペイロード長を抽出
+%% @end
+%%--------------------------------------------------------------------
 extract_extend_payload_length_64(RawMsg) ->
   <<Length:64/unsigned-integer, RemainMsg/binary>> = RawMsg,
   {Length, RemainMsg}.
 
+%%--------------------------------------------------------------------
+%% @doc
 %% マスクキーの適用
+%% @end
+%%--------------------------------------------------------------------
 apply_mask_key({MaskKey, RawMsg}) ->
   apply_mask_key(RawMsg, MaskKey).
 apply_mask_key(RawMsg, MaskKey) ->
@@ -425,9 +550,9 @@ apply_mask_key(RawMsg, MaskKey) ->
 %%     <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawMsg]))}.
 
 
-%%%-------------------------------------------------------------------
+%%%===================================================================
 %%% テスト関数
-%%%-------------------------------------------------------------------
+%%%===================================================================
 make_accept_header_value_test() ->
   SWKey = "E4WSEcseoWr4csPLS2QJHA==",
   AcceptHeaderValue = make_accept_header_value(SWKey),
