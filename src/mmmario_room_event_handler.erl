@@ -12,8 +12,11 @@
 -behaviour(gen_event).
 
 %% API
--export([start_link/0,
-  add_handler/0]).
+-export([
+  start_link/0,
+  add_handler/0,
+  stop/0
+]).
 
 %% gen_event callbacks
 -export([init/1,
@@ -63,6 +66,16 @@ add_handler() ->
 %%--------------------------------------------------------------------
 notify(Event) ->
   gen_event:notify(?SERVER, Event).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% イベントハンドラを停止する
+%% @end
+%%--------------------------------------------------------------------
+stop() ->
+  ets:delete(?SERVER),
+  gen_event:stop(?SERVER),
+  ok.
 
 %%%===================================================================
 %%% gen_event callbacks
