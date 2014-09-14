@@ -18,10 +18,10 @@
 %% API
 -export([
   start_link/0,
-  new_player/1,
-  exit_player/1,
-  ready_player/1,
-  die_player/1
+  new_player/2,
+  exit_player/2,
+  ready_player/2,
+  die_player/2
 ]).
 
 %% gen_fsm callbacks
@@ -65,32 +65,32 @@ start_link() ->
 %% 新規プレイヤー参上
 %% @end
 %%--------------------------------------------------------------------
-new_player(PUid) ->
-  gen_fsm:send_event(?SERVER, {new_player, PUid}).
+new_player(RPid, PUid) ->
+  gen_fsm:send_event(RPid, {new_player, PUid}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% プレイヤーの離脱
 %% @end
 %%--------------------------------------------------------------------
-exit_player(PUid) ->
-  gen_fsm:send_event(?SERVER, {exit_player, PUid}).
+exit_player(RPid, PUid) ->
+  gen_fsm:send_all_state_event(RPid, {exit_player, PUid}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% pregame状態で、プレイヤーが準備出来た場合この関数を呼ぶ
 %% @end
 %%--------------------------------------------------------------------
-ready_player(PUid) ->
-  gen_fsm:send_event(?SERVER, {ready_player, PUid}).
+ready_player(RPid, PUid) ->
+  gen_fsm:send_event(RPid, {ready_player, PUid}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% プレイヤーがゲームで死んだ時に呼ぶ関数
 %% @end
 %%--------------------------------------------------------------------
-die_player(PUid) ->
-  gen_fsm:send_event(?SERVER, {die_player, PUid}).
+die_player(RPid, PUid) ->
+  gen_fsm:send_event(RPid, {die_player, PUid}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -128,20 +128,6 @@ idle({new_player, PUid}, State = #roomstate{uid = Ruid, pcount = PCount, players
     0 > NextPCount orelse MaxPCount < NextPCount ->
       error_logger:error_msg("NextPCount is odd.~n"),
       {stop, "NextPCount is odd.", State}
-  end;
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% 待ち状態。
-%% プレイヤー離脱イベントが来たら削除する
-%% @end
-%%--------------------------------------------------------------------
-idle({exit_player, PUid}, State = #roomstate{pcount = PCount, players = PUids}) ->
-  NextPCount = PCount - 1,
-  if
-    0 =< NextPCount -> {next_state, idle, State#roomstate{pcount = NextPCount, players = maps:remove(PUid, PUids)}};
-    0 > NextPCount -> {stop, "PCount is odd.", State#roomstate{pcount = NextPCount, players = #{}}}
   end.
 
 %%--------------------------------------------------------------------
@@ -160,42 +146,7 @@ pregame({ready_player, _PUid}, State = #roomstate{uid = RUid, pcount = PCount, r
     0 =< NextRCount andalso PCount > NextRCount ->
       {next_state, pregame, State#roomstate{rcount = NextRCount}};
     0 > NextRCount orelse PCount < NextRCount -> {stop, "RCount is odd.", State}
-  end;
-
-%%--------------------------------------------------------------------
-%% @doc
-%% ゲーム開始前状態。
-%% 突然のプレイヤー抜けに対応
-%% @end
-%%--------------------------------------------------------------------
-pregame({exit_player, PUid}, State = #roomstate{uid = RUid, pcount = PCount, players = PUids}) ->
-  NextPCount = PCount - 1,
-  if
-    0 < NextPCount ->
-      error_logger:info_msg("The player [~p] is exit.~n", [PUid]),
-      {next_state, pregame, State#roomstate{pcount = NextPCount, players = maps:remove(PUid, PUids)}}; % idleには戻らない
-    0 >= NextPCount ->
-      error_logger:error_msg("No body in the room.~n"),
-      mmmario_room_event_handler:notify({abnormal_end, RUid}),
-      {stop, "No body in the room.", State#roomstate{pcount = NextPCount, players = #{}}} % 誰もいなくなったらストップする
   end.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% ゲーム中状態。
-%% 突然抜けたプレイヤーに対応する
-%% @end
-%%--------------------------------------------------------------------
-ongame({exit_player, PUid}, State = #roomstate{uid = RUid, pcount = PCount, players = PUids}) ->
-  NextPCount = PCount - 1,
-  if
-    0 < NextPCount ->
-      error_logger:info_msg("The player [~p] is exit.~n", [PUid]),
-      {next_state, ongame, State#roomstate{pcount = NextPCount, players = maps:remove(PUid, PUids)}};
-    0 == NextPCount ->
-      mmmario_room_event_handler:notify({abnormal_end, RUid}),
-      {stop, "No body in the room.", State}
-  end;
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -205,15 +156,23 @@ ongame({exit_player, PUid}, State = #roomstate{uid = RUid, pcount = PCount, play
 %%--------------------------------------------------------------------
 ongame({die_player, PUid}, State = #roomstate{uid = RUid, pcount = PCount, players = PUids}) ->
   NextPCount = PCount - 1,
+  IsKey = maps:is_key(PUid, PUids),
   if
-    1 < NextPCount ->
+    IsKey andalso 1 < NextPCount ->
       error_logger:info_msg("The player [~p] dies.~n", [PUid]),
       {next_state, ongame, State#roomstate{pcount = NextPCount, players = maps:update(PUid, [{state, dead}], PUids)}};
-    1 == NextPCount ->
-      ExtractAlivePlayerFun = fun(K, V, Acc) when V =:= [{state, alive}] -> Acc = K end,
-      AlivePUid = maps:fold(ExtractAlivePlayerFun, undefined, PUids),
+    IsKey andalso 1 == NextPCount ->
+      NextPUids = maps:update(PUid, [{state, dead}], PUids),
+      ExtractAlivePlayerFun = fun(K, V, Acc) ->
+        if
+          V =:= [{state, alive}] andalso Acc =:= undefined -> K;
+          true -> Acc
+        end
+      end,
+      AlivePUid = maps:fold(ExtractAlivePlayerFun, undefined, NextPUids),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, RUid]),
-      {next_state, postgame, State#roomstate{pcount = NextPCount, players = maps:update(PUid, [{state, dead}], PUids)}};
+      {next_state, postgame, State#roomstate{pcount = NextPCount, players = NextPUids}};
+    not IsKey -> {next_state, ongame, State};
     0 >= NextPCount ->
       mmmario_room_event_handler:notify({abnormal_end, RUid}),
       {stop, "No body in the room.", State#roomstate{pcount = 0, players = #{}}}
@@ -222,19 +181,25 @@ ongame({die_player, PUid}, State = #roomstate{uid = RUid, pcount = PCount, playe
 %%--------------------------------------------------------------------
 %% @doc
 %% ゲーム終了状態。
+%% 終了処理を行う。
 %% @end
 %%--------------------------------------------------------------------
-postgame({get_result, PUid}, State = #roomstate{pcount = PCount, players = PUids}) ->
+postgame({_, _PUid}, State) ->
   {next_state, postgame, State}.
 
 %%--------------------------------------------------------------------
-%% @private
 %% @doc
-%%
+%% exit_playerイベントはあらゆる状態で処理する必要がある
 %% @end
 %%--------------------------------------------------------------------
-handle_event(_Event, StateName, State) ->
-  {next_state, StateName, State}.
+handle_event({exit_player, PUid}, StateName, State = #roomstate{uid = RUid, pcount = PCount, players = PUids}) ->
+  NextPCount = PCount - 1,
+  if
+    0 < NextPCount -> {next_state, StateName, State#roomstate{pcount = NextPCount, players = maps:remove(PUid, PUids)}};
+    0 >= NextPCount ->
+      error_logger:error_msg("No body in the room[~p]~n", [RUid]),
+      {stop, "No body in the room.", State#roomstate{pcount = 0, players = #{}}}
+  end.
 
 %%--------------------------------------------------------------------
 %% @doc

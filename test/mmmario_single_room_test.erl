@@ -46,7 +46,8 @@ single_room_test_() ->
     fun max_player_to_room/1,
     fun exit_player_from_max_room/1,
     fun exit_player_from_not_max_room/1,
-    fun winner_for_max_room_without_exit_player/1
+    fun winner_for_max_room_without_exit_player/1,
+    fun winner_for_max_room_with_exit_player/1
   ],
   {foreach, fun setup_single_room/0, fun cleanup_single_room/1, Ins}.
 
@@ -75,7 +76,7 @@ cleanup_single_room(RPid) ->
 %% @end
 %%--------------------------------------------------------------------
 add_new_player_to_room(RPid) ->
-  mmmario_room:new_player(make_ref()),
+  mmmario_room:new_player(RPid, make_ref()),
   {StateName, Opts} = get_state(RPid),
   {pcount, PCount} = proplists:lookup(pcount, Opts),
   [?_assertEqual(idle, StateName),
@@ -90,7 +91,7 @@ max_player_to_room(RPid) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   {InitialStateName, InitialOpts} = get_state(RPid),
   {pcount, InitialPCount} = proplists:lookup(pcount, InitialOpts),
-  [mmmario_room:new_player(make_ref()) || _ <- lists:seq(1, MaxPCount)],
+  [mmmario_room:new_player(RPid, make_ref()) || _ <- lists:seq(1, MaxPCount)],
   {PostStateName, PostOpts} = get_state(RPid),
   {pcount, PostPCount} = proplists:lookup(pcount, PostOpts),
   [?_assertEqual(idle, InitialStateName),
@@ -109,11 +110,11 @@ exit_player_from_max_room(RPid) ->
   {InitialStateName, InitialOpts} = get_state(RPid),
   {pcount, InitialPCount} = proplists:lookup(pcount, InitialOpts),
   PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
-  [mmmario_room:new_player(PUid) || PUid <- PUids],
+  [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {MaxStateName, MaxOpts} = get_state(RPid),
   {pcount, MaxPCount1} = proplists:lookup(pcount, MaxOpts),
   % 1人ずつMaxPCount分離脱させる
-  [mmmario_room:exit_player(PUid) || PUid <- PUids],
+  [mmmario_room:exit_player(RPid, PUid) || PUid <- lists:droplast(PUids)],
   {PostStateName, PostOpts} = get_state(RPid),
   {pcount, PostPCount} = proplists:lookup(pcount, PostOpts),
   [?_assertEqual(idle, InitialStateName),
@@ -121,7 +122,7 @@ exit_player_from_max_room(RPid) ->
     ?_assertEqual(pregame, MaxStateName),
     ?_assertEqual(MaxPCount, MaxPCount1),
     ?_assertEqual(pregame, PostStateName),
-    ?_assertEqual(0, PostPCount)].
+    ?_assertEqual(1, PostPCount)].
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -134,11 +135,11 @@ exit_player_from_not_max_room(RPid) ->
   {InitialStateName, InitialOpts} = get_state(RPid),
   {pcount, InitialPCount} = proplists:lookup(pcount, InitialOpts),
   PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
-  [mmmario_room:new_player(PUid) || PUid <- PUids],
+  [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {MaxStateName, MaxOpts} = get_state(RPid),
   {pcount, MaxPCount1} = proplists:lookup(pcount, MaxOpts),
   % 1人ずつMaxPCount分離脱させる
-  [mmmario_room:exit_player(PUid) || PUid <- PUids],
+  [mmmario_room:exit_player(RPid, PUid) || PUid <- lists:droplast(PUids)],
   {PostStateName, PostOpts} = get_state(RPid),
   {pcount, PostPCount} = proplists:lookup(pcount, PostOpts),
   [?_assertEqual(idle, InitialStateName),
@@ -146,7 +147,7 @@ exit_player_from_not_max_room(RPid) ->
     ?_assertEqual(idle, MaxStateName),
     ?_assertEqual(MaxPCount, MaxPCount1),
     ?_assertEqual(idle, PostStateName),
-    ?_assertEqual(0, PostPCount)].
+    ?_assertEqual(1, PostPCount)].
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -157,12 +158,37 @@ exit_player_from_not_max_room(RPid) ->
 winner_for_max_room_without_exit_player(RPid) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
-  [mmmario_room:new_player(PUid) || PUid <- PUids],
+  [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {PregameStateName, _} = get_state(RPid),
-  [mmmario_room:ready_player(PUid) || PUid <- PUids],
+  [mmmario_room:ready_player(RPid, PUid) || PUid <- PUids],
   {OngameStateName, OngameOpts} = get_state(RPid),
   {rcount, OngameRCount} = proplists:lookup(rcount, OngameOpts),
-  [mmmario_room:die_player(PUid) || PUid <- lists:droplast(PUids)], % リストの最後のプレイヤーを勝者とする
+  [mmmario_room:die_player(RPid, PUid) || PUid <- lists:droplast(PUids)], % リストの最後のプレイヤーを勝者とする
+  {PostgameStateName, PostgameOpts} = get_state(RPid),
+  {pcount, PostgamePCount} = proplists:lookup(pcount, PostgameOpts),
+  [?_assertEqual(pregame, PregameStateName),
+    ?_assertEqual(MaxPCount, OngameRCount),
+    ?_assertEqual(ongame, OngameStateName),
+    ?_assertEqual(postgame, PostgameStateName),
+    ?_assertEqual(1, PostgamePCount)].
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 満室状態で勝者を決める。
+%% 途中離脱者が1人いる
+%% @end
+%%--------------------------------------------------------------------
+winner_for_max_room_with_exit_player(RPid) ->
+  MaxPCount = application:get_env(mmmario, maxpcount, 6),
+  PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
+  error_logger:info_msg("PUids: ~p~n", [PUids]),
+  [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
+  {PregameStateName, _} = get_state(RPid),
+  [mmmario_room:ready_player(RPid, PUid) || PUid <- PUids],
+  {OngameStateName, OngameOpts} = get_state(RPid),
+  {rcount, OngameRCount} = proplists:lookup(rcount, OngameOpts),
+  [mmmario_room:exit_player(RPid, PUid) || PUid <- lists:sublist(PUids, 2)],
+  [mmmario_room:die_player(RPid, PUid) || PUid <- lists:droplast(PUids)], % リストの最後のプレイヤーを勝者とする
   {PostgameStateName, PostgameOpts} = get_state(RPid),
   {pcount, PostgamePCount} = proplists:lookup(pcount, PostgameOpts),
   [?_assertEqual(pregame, PregameStateName),
