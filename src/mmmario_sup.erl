@@ -49,7 +49,10 @@ init([]) ->
   EvtMgr = {{local, mmmario_game_event_handler}, {mmmario_game_event_handler, start_link, []},
     Restart, Shutdown, supervisor, [mmmario_event_handler]},
 
-  {ok, {SupFlags, [PlayerSup, WSServSup, EvtMgr]}}.
+  RoomSup = {mmmario_room_sup, {mmmario_room_sup, start_link, []},
+    Restart, Shutdown, supervisor, [mmmario_room_sup]},
+
+  {ok, {SupFlags, [PlayerSup, WSServSup, EvtMgr, RoomSup]}}.
 
 %%%===================================================================
 %%% Internal functions

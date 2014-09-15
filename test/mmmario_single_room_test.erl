@@ -57,7 +57,7 @@ single_room_test_() ->
 %% @end
 %%--------------------------------------------------------------------
 setup_single_room() ->
-  {ok, _} = mmmario_room_event_handler:start_link(),
+  mmmario_room_server:start_link(),
   {ok, RPid} = mmmario_room:start_link(),
   RPid.
 
@@ -68,7 +68,7 @@ setup_single_room() ->
 %%--------------------------------------------------------------------
 cleanup_single_room(RPid) ->
   exit(RPid, normal),
-  mmmario_room_event_handler:stop().
+  mmmario_room_server:stop().
 
 %%--------------------------------------------------------------------
 %% @doc
