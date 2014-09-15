@@ -21,6 +21,7 @@
 -export([
   init/1,
   idle/2,
+  ongame/2,
   handle_event/3,
   handle_sync_event/4,
   handle_info/3,
@@ -29,6 +30,9 @@
 ]).
 
 -define(SERVER, ?MODULE).
+-define(PPID(PUid), element(1, PUid)).
+
+-include("mmmario_game_type.hrl").
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -38,11 +42,10 @@
 -record(pstate, {
   uid, % プレイヤーのUID {pid(), #ref()}
   name, % プレイヤーの名前
-  roomuid, % roomのPid
+  roompid, % roomのPid
   wsservpid, % wsservのPid
   pos = {0, 0}, % キャラクターの位置
-  ltime = 0, % 生存時間
-  ehdlr % イベントハンドラ
+  ltime = 0 % 生存時間
 }).
 
 %%%===================================================================
@@ -63,43 +66,79 @@ start_link(WSServPid, Name) ->
 %% プレイヤーを動かす
 %% @end
 %%--------------------------------------------------------------------
-move_player(PPid, XY = {_, _}) ->
-  gen_fsm:send_event(PPid, {move, XY}).
+move_player(PUid, Rect) ->
+  gen_fsm:send_event(?PPID(PUid), {move, Rect}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% 名前変更を行う
 %% @end
 %%--------------------------------------------------------------------
-change_player_name(PPid, Name) ->
-  gen_fsm:send_all_state_event(PPid, {name, Name}).
+change_player_name(PUid, Name) ->
+  gen_fsm:send_all_state_event(?PPID(PUid), {name, Name}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 初期化
 %% 初期化後はidle状態にしてプレイヤーからのイベントを待つ
 %% @end
 %%--------------------------------------------------------------------
 init([WSServPid, Name]) ->
-  HandlerId = mmmario_game_event_handler:add_handler(),
+  PUid = {self(), make_ref()},
+  RPid = mmmario_room_server:new_player(PUid),
   process_flag(trap_exit, true),
   link(WSServPid),
-  {ok, idle, #pstate{uid = {self(), make_ref()}, wsservpid = WSServPid, name = Name, ehdlr = HandlerId}}.
+  {ok, idle, #pstate{uid = PUid, wsservpid = WSServPid, name = Name, roompid = RPid}}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% idle状態
 %% readyイベントが来たら返答する
 %% @end
 %%--------------------------------------------------------------------
-idle({ready, RUid}, S = #pstate{name = Name}) ->
-  {next_state, move, S}.
+idle({ready, RPid}, State) ->
+  mmmario_room:ready_player(RPid, self()),
+  {next_state, ongame, State}.
 
 %%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% rects_changイベント
+%% 他のプレイヤーのキャラクター位置が変わったので、クライアントへ通知する
+%% @end
+%%--------------------------------------------------------------------
+ongame({rects_change, Rects}, State = #pstate{wsservpid = WSPid}) ->
+  Text = string:join([rect_to_text(Rect) || Rect <- Rects], "|"),
+  mmmario_wsserv:send(WSPid, Text),
+  {next_state, ongame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% ゲーム状態
+%% @end
+%%--------------------------------------------------------------------
+ongame({move, Rect}, State = #pstate{uid = PUid, roompid = RPid}) ->
+  mmmario_room:move_player(RPid, PUid, Rect),
+  {next_state, ongame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% ゲーム状態で死亡
+%% @end
+%%--------------------------------------------------------------------
+ongame(die, State) ->
+  {next_state, postgame, State}.
+
+%%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 名前書き換え
 %% いつでも受け取る
@@ -116,14 +155,13 @@ handle_info(_Info, SName, S) ->
   {next_state, SName, S}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 終了処理関数
-%% ゲームイベントハンドラにプレイヤーが消えることを知らせておく
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _SName, #pstate{}) ->
   io:format("terminating player with: ~p~n", [Reason]),
-  mmmario_game_event_handler:notify({delete_chara, self()}),
   ok.
 
 code_change(_OldVsn, SName, S, _Extra) ->

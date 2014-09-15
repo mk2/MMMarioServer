@@ -45,3 +45,28 @@ gety(#vec{y = Y}) -> Y.
   origin, % 原点 vec()
   size    % サイズ vec()
 }).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% テキストをrectレコードに変換
+%% ex: "R5,4,3,2" -> #rect{origin = #vec{x = 5, y = 4}, size = #vec{x = 3, y = 2}}
+%% @end
+%%--------------------------------------------------------------------
+text_to_rect("r" ++ RawText) ->
+  text_to_rect("R" ++ RawText);
+text_to_rect("R" ++ RawText) ->
+  [{X, _}, {Y, _}, {W, _}, {H, _} | _] = lists:map(fun(Txt) -> string:to_integer(Txt) end, string:tokens(RawText, ",")),
+  #rect{origin = #vec{x = x, y = Y}, size = #vec{x = W, y = Y}}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% レクトをテキストに変換
+%% ex: #rect{origin = #vec{x = 5, y = 4}, size = #vec{x = 3, y = 2}} -> "R5,4,3,2"
+%% @end
+%%--------------------------------------------------------------------
+rect_to_text(#rect{origin = #vec{x = ox, y = oy}, size = #vec{x = sx, y = sy}}) ->
+  "R" ++ string:join([ox, oy, sx, sy], ",").
+
+getorigin(#rect{origin = Origin}) -> Origin.
+
+getsize(#rect{size = Size}) -> Size.
