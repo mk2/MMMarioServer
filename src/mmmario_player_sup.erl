@@ -12,7 +12,14 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_player/2, exit_player/1, children/0, childPids/0]).
+-export([
+  start_link/0,
+  stop/0,
+  start_player/2,
+  exit_player/1,
+  children/0,
+  childPids/0
+]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -23,8 +30,21 @@
 %%% API functions
 %%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%% スーパバイザ開始
+%% @end
+%%--------------------------------------------------------------------
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% スーパーバイザ停止
+%% @end
+%%--------------------------------------------------------------------
+stop() ->
+  exit(whereis(?SERVER), normal).
 
 start_player(WSServPid, Name) ->
   supervisor:start_child(?SERVER, [WSServPid, Name]). % simple_one_for_oneだとArgsの部分が自動で子に渡されるらしい

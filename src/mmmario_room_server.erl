@@ -91,8 +91,8 @@ new_state(RPid, State) ->
 %% 部屋の削除
 %% @end
 %%--------------------------------------------------------------------
-delete_room(RUid) ->
-  gen_server:call(?SERVER, {delete_room, RUid}).
+delete_room(RPid) ->
+  gen_server:call(?SERVER, {delete_room, RPid}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -156,6 +156,17 @@ handle_call({new_player, PUid}, _From, State) ->
       ets:insert(?SERVER, #rinfo{pid = RPid, state = idle}),
       {reply, RPid, State}
   end;
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 部屋削除
+%% 部屋プロセス自体は勝手に停止するので、ここではETSから削除するだけ
+%% @end
+%%--------------------------------------------------------------------
+handle_call({delete_room, RPid}, _From, State) ->
+  ets:delete(?SERVER, RPid),
+  {reply, true, State};
 
 %%--------------------------------------------------------------------
 %% @doc

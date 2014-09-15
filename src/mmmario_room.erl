@@ -43,7 +43,6 @@
 ]).
 
 -define(SERVER, ?MODULE).
--define(ETSNAME, {?SERVER, self()}). % 各プロセスごとのETS名
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -51,6 +50,7 @@
 %% @end
 %%--------------------------------------------------------------------
 -record(roomstate, {
+  tid, % ETSテーブルのID
   pcount = 0, % 部屋にいる(はずの)プレイヤー数
   rcount = 0, % ゲーム開始直前のプレイヤー数(ゲーム開始以降この属性は固定になる)
   players = #{} % プレイヤーのUIDリスト, #{PUid => [{state, alive|dead}]}
@@ -131,10 +131,9 @@ die_player(RPid, PUid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  EtsName = ?ETSNAME,
-  EtsName = ets:new(EtsName, [set, named_table, {keypos, #cinfo.uid}]),
+  Tid = ets:new(?SERVER, [set, {keypos, #cinfo.uid}]),
   process_flag(trap_exit, true),
-  {ok, idle, #roomstate{}}.
+  {ok, idle, #roomstate{tid = Tid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -146,16 +145,18 @@ init([]) ->
 idle({new_player, PUid}, State = #roomstate{pcount = PCount, players = PUids}) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   NextPCount = PCount + 1,
+  NextPUids = maps:put(PUid, [{state, alive}], PUids),
   if
-    NextPCount == MaxPCount ->
+    MaxPCount =:= NextPCount ->
       error_logger:info_msg("Room[~p] is full of players.~n", [self()]),
       mmmario_room_server:new_state(self(), pregame),
-      {next_state, pregame, State#roomstate{pcount = NextPCount, players = maps:put(PUid, [{state, alive}], PUids)}};
+      notice_ready_player(maps:keys(NextPUids)),
+      {next_state, pregame, State#roomstate{pcount = NextPCount, players = NextPUids}};
     0 =< NextPCount andalso MaxPCount > NextPCount ->
-      {next_state, idle, State#roomstate{pcount = NextPCount, players = maps:put(PUid, [{state, alive}], PUids)}};
+      {next_state, idle, State#roomstate{pcount = NextPCount, players = NextPUids}};
     0 > NextPCount orelse MaxPCount < NextPCount ->
       error_logger:error_msg("NextPCount is odd.~n"),
-      mmmario_room_server:delete_room(self()),
+      true = mmmario_room_server:delete_room(self()),
       {stop, "NextPCount is odd.", State}
   end.
 
@@ -169,14 +170,14 @@ idle({new_player, PUid}, State = #roomstate{pcount = PCount, players = PUids}) -
 pregame({ready_player, _PUid}, State = #roomstate{pcount = PCount, rcount = RCount}) ->
   NextRCount = RCount + 1,
   if
-    PCount == NextRCount ->
+    PCount =:= NextRCount ->
       error_logger:info_msg("Room[~p] All players are ready to game!!~n", [self()]),
       mmmario_room_server:new_state(self(), ongame),
       {next_state, ongame, State#roomstate{rcount = NextRCount}};
     0 =< NextRCount andalso PCount > NextRCount ->
       {next_state, pregame, State#roomstate{rcount = NextRCount}};
     0 > NextRCount orelse PCount < NextRCount ->
-      mmmario_room_server:delete_room(self()),
+      true = mmmario_room_server:delete_room(self()),
       {stop, "RCount is odd.", State}
   end.
 
@@ -208,7 +209,7 @@ ongame({die_player, PUid}, State = #roomstate{pcount = PCount, players = PUids})
       {next_state, postgame, State#roomstate{pcount = NextPCount, players = NextPUids}};
     not IsKey -> {next_state, ongame, State};
     0 >= NextPCount ->
-      mmmario_room_server:delete_room(self()),
+      true = mmmario_room_server:delete_room(self()),
       {stop, "No body in the room.", State#roomstate{pcount = 0, players = #{}}}
   end;
 
@@ -219,8 +220,8 @@ ongame({die_player, PUid}, State = #roomstate{pcount = PCount, players = PUids})
 %% ので全プレイヤーに通知を行う
 %% @end
 %%--------------------------------------------------------------------
-ongame({move_player, PUid, Rect}, State = #roomstate{}) ->
-  ets:insert(?ETSNAME, #cinfo{uid = PUid, rect = Rect}),
+ongame({move_player, PUid, Rect}, State = #roomstate{tid = Tid}) ->
+  ets:insert(Tid, #cinfo{uid = PUid, rect = Rect}),
   {next_state, ongame, State}.
 
 %%--------------------------------------------------------------------
@@ -245,7 +246,7 @@ handle_event({exit_player, PUid}, StateName, State = #roomstate{pcount = PCount,
     0 < NextPCount -> {next_state, StateName, State#roomstate{pcount = NextPCount, players = maps:remove(PUid, PUids)}};
     0 >= NextPCount ->
       error_logger:error_msg("No body in the room[~p]~n", [self()]),
-      mmmario_room_server:delete_room(self()),
+      true = mmmario_room_server:delete_room(self()),
       {stop, "No body in the room.", State#roomstate{pcount = 0, players = #{}}}
   end.
 
@@ -307,9 +308,17 @@ format_status(normal, [PDict, StatusData]) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
+%% プレイヤーにready_playerイベントを送る
+%% @end
+%%--------------------------------------------------------------------
+notice_ready_player(PUids) ->
+  [mmmario_player:ready_player(PUid) || PUid <- PUids].
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
 %% cinfoに変更が生じた時に、変更元以外に全てを通知する
 %% @end
 %%--------------------------------------------------------------------
 notice_cinfo_change_except_origin(PUid) ->
-  Rects = ets:select(?ETSNAME, ets:fun2ms(fun(#cinfo{uid = Uid, rect = Rect}) when PUid =/= Uid -> Rect end)),
   ok.

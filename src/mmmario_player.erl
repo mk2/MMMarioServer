@@ -14,6 +14,8 @@
 %% API
 -export([
   start_link/2,
+  stop/1,
+  ready_player/1,
   move_player/2,
   change_player_name/2
 ]).
@@ -26,7 +28,8 @@
   handle_sync_event/4,
   handle_info/3,
   terminate/3,
-  code_change/4
+  code_change/4,
+  format_status/2
 ]).
 
 -define(SERVER, ?MODULE).
@@ -60,6 +63,23 @@
 %%--------------------------------------------------------------------
 start_link(WSServPid, Name) ->
   gen_fsm:start_link(?MODULE, [WSServPid, Name], []).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 通常終了
+%% @end
+%%--------------------------------------------------------------------
+stop(PPid) ->
+  exit(PPid, normal).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% レディ状態を確認する
+%% @end
+%%--------------------------------------------------------------------
+ready_player(PUid) ->
+  error_logger:info_msg("~p~n", [PUid]),
+  gen_fsm:send_event(?PPID(PUid), ready).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -102,7 +122,7 @@ init([WSServPid, Name]) ->
 %% readyイベントが来たら返答する
 %% @end
 %%--------------------------------------------------------------------
-idle({ready, RPid}, State) ->
+idle(ready, State = #pstate{roompid = RPid}) ->
   mmmario_room:ready_player(RPid, self()),
   {next_state, ongame, State}.
 
@@ -160,12 +180,32 @@ handle_info(_Info, SName, S) ->
 %% 終了処理関数
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, _SName, #pstate{}) ->
+terminate(Reason, _SName, #pstate{uid = PUid, roompid = RPid}) ->
   io:format("terminating player with: ~p~n", [Reason]),
+  mmmario_room:exit_player(RPid, ?PPID(PUid)),
   ok.
 
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
 code_change(_OldVsn, SName, S, _Extra) ->
   {ok, SName, S}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 主にユニットテスト用…
+%% @end
+%%--------------------------------------------------------------------
+format_status(normal, [PDict, StatusData]) ->
+  io:format("PDict: ~p~n", [PDict]),
+  io:format("StatusData: ~p~n", [StatusData]),
+  [{data, [
+    {"Name", StatusData#pstate.name},
+    {"Uid", StatusData#pstate.uid}]}].
 
 %%%===================================================================
 %%% Internal functions

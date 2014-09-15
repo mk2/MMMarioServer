@@ -31,6 +31,17 @@ get_state(RPid) ->
   {"Players", Players} = proplists:lookup("Players", PData),
   {StateName, [{pcount, PCount}, {rcount, RCount}, {players, Players}]}.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% フェイクプロセスを生成する
+%% @end
+%%--------------------------------------------------------------------
+spawnFakeProcess() ->
+  spawn(fun Me() -> receive Any -> io:format("~p~n", [Any]), Me() end end).
+
+spawnFakePlayerUid() ->
+  {spawnFakeProcess(), make_ref()}.
+
 %%====================================================================
 %% single_room_test用テスト
 %%====================================================================
@@ -72,11 +83,11 @@ cleanup_single_room(RPid) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% 新規プレイヤーを追加するをテスト
+%% 新規プレイヤーを追加するテスト
 %% @end
 %%--------------------------------------------------------------------
 add_new_player_to_room(RPid) ->
-  mmmario_room:new_player(RPid, make_ref()),
+  mmmario_room:new_player(RPid, spawnFakePlayerUid()),
   {StateName, Opts} = get_state(RPid),
   {pcount, PCount} = proplists:lookup(pcount, Opts),
   [?_assertEqual(idle, StateName),
@@ -91,7 +102,7 @@ max_player_to_room(RPid) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   {InitialStateName, InitialOpts} = get_state(RPid),
   {pcount, InitialPCount} = proplists:lookup(pcount, InitialOpts),
-  [mmmario_room:new_player(RPid, make_ref()) || _ <- lists:seq(1, MaxPCount)],
+  [mmmario_room:new_player(RPid, spawnFakePlayerUid()) || _ <- lists:seq(1, MaxPCount)],
   {PostStateName, PostOpts} = get_state(RPid),
   {pcount, PostPCount} = proplists:lookup(pcount, PostOpts),
   [?_assertEqual(idle, InitialStateName),
@@ -109,7 +120,7 @@ exit_player_from_max_room(RPid) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   {InitialStateName, InitialOpts} = get_state(RPid),
   {pcount, InitialPCount} = proplists:lookup(pcount, InitialOpts),
-  PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
+  PUids = [spawnFakePlayerUid() || _ <- lists:seq(1, MaxPCount)],
   [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {MaxStateName, MaxOpts} = get_state(RPid),
   {pcount, MaxPCount1} = proplists:lookup(pcount, MaxOpts),
@@ -134,7 +145,7 @@ exit_player_from_not_max_room(RPid) ->
   MaxPCount = 5,
   {InitialStateName, InitialOpts} = get_state(RPid),
   {pcount, InitialPCount} = proplists:lookup(pcount, InitialOpts),
-  PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
+  PUids = [spawnFakePlayerUid() || _ <- lists:seq(1, MaxPCount)],
   [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {MaxStateName, MaxOpts} = get_state(RPid),
   {pcount, MaxPCount1} = proplists:lookup(pcount, MaxOpts),
@@ -157,7 +168,7 @@ exit_player_from_not_max_room(RPid) ->
 %%--------------------------------------------------------------------
 winner_for_max_room_without_exit_player(RPid) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
-  PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
+  PUids = [spawnFakePlayerUid() || _ <- lists:seq(1, MaxPCount)],
   [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {PregameStateName, _} = get_state(RPid),
   [mmmario_room:ready_player(RPid, PUid) || PUid <- PUids],
@@ -180,7 +191,7 @@ winner_for_max_room_without_exit_player(RPid) ->
 %%--------------------------------------------------------------------
 winner_for_max_room_with_exit_player(RPid) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
-  PUids = [make_ref() || _ <- lists:seq(1, MaxPCount)],
+  PUids = [spawnFakePlayerUid() || _ <- lists:seq(1, MaxPCount)],
   error_logger:info_msg("PUids: ~p~n", [PUids]),
   [mmmario_room:new_player(RPid, PUid) || PUid <- PUids],
   {PregameStateName, _} = get_state(RPid),
