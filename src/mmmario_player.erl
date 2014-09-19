@@ -156,18 +156,6 @@ idle(ready, State = #playerstate{roompid = RPid}) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% rects_changイベント
-%% 他のプレイヤーのキャラクター位置が変わったので、クライアントへ通知する
-%% @end
-%%--------------------------------------------------------------------
-ongame({rects_change, Rects}, State = #playerstate{wsservpid = WSPid}) ->
-  Text = string:join([rect_to_text(Rect) || Rect <- Rects], "|"),
-  mmmario_wsserv:send(WSPid, Text),
-  {next_state, ongame, State};
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
 %% ゲーム状態
 %% @end
 %%--------------------------------------------------------------------
@@ -222,7 +210,7 @@ handle_sync_event(exit, _From, _SName, State) ->
 %% PPidからPUidを取得
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(ppid, _From, SName, State = #playerstate{uid = PUid}) ->
+handle_sync_event(puid, _From, SName, State = #playerstate{uid = PUid}) ->
   Reply = PUid,
   {reply, Reply, SName, State};
 

@@ -134,7 +134,7 @@ die_player(RPid, PUid) ->
 %%--------------------------------------------------------------------
 init([]) ->
   PTid = ets:new(?SERVER, [set, protected, {keypos, #cinfo.uid}, {read_concurrency, true}, {write_concurrency, true}]),
-  EMPid = mmmario_room_event:start_link(),
+  {ok, EMPid} = mmmario_room_event:start_link(),
   process_flag(trap_exit, true),
   {ok, idle, #roomstate{ptid = PTid, empid = EMPid}}.
 
