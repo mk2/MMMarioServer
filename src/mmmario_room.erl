@@ -20,6 +20,7 @@
 %% API
 -export([
   start_link/0,
+  stop/1,
   new_player/2,
   exit_player/2,
   ready_player/2,
@@ -77,6 +78,14 @@
 %%--------------------------------------------------------------------
 start_link() ->
   gen_fsm:start_link(?MODULE, [], []).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 部屋停止
+%% @end
+%%--------------------------------------------------------------------
+stop(RPid) ->
+  gen_fsm:sync_send_all_state_event(RPid, stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -257,6 +266,10 @@ handle_event({exit_player, PUid}, StateName, State = #roomstate{pcount = PCount,
 %% @end
 %%--------------------------------------------------------------------
 handle_sync_event(stop, _From, StateName, State) ->
+  Reply = ok,
+  {stop, "Stop room", Reply, State};
+
+handle_sync_event(_Event, _From, StateName, State) ->
   Reply = ok,
   {reply, Reply, StateName, State}.
 

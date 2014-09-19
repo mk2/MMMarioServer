@@ -46,6 +46,15 @@ spawnPlayer() ->
   {ok, PPid} = mmmario_player:start_link(spawnFakeWSSrv(), make_ref()),
   PPid.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% N人分のプレイヤーを生成
+%% @end
+%%--------------------------------------------------------------------
+npuids(N) ->
+  PPids = [spawnPlayer() || _ <- lists:seq(1, N)],
+  PUids = [mmmario_player:puid(PPid) || PPid <- PPids],
+  {PUids, PPids}.
 
 %%====================================================================
 %% プレイヤーテスト
@@ -57,10 +66,10 @@ spawnPlayer() ->
 %% @end
 %%--------------------------------------------------------------------
 player_test_() ->
-  Ins = [
-    fun add_player_to_room/1
-  ],
-  {foreach, fun setup_misc/0, fun cleanup_misc/1, Ins}.
+  Ins = fun(SetupData) ->
+    add_player_to_room_max(SetupData)
+  end,
+  {setup, fun setup_misc/0, fun cleanup_misc/1, Ins}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -78,28 +87,31 @@ setup_misc() ->
 %% @end
 %%--------------------------------------------------------------------
 cleanup_misc(_) ->
-  mmmario_player_sup:stop(),
-  mmmario_room_server:stop(),
-  mmmario_room_sup:stop().
+  ok.
 
 %%--------------------------------------------------------------------
 %% @doc
 %% プレイヤーの状態がidleでないことをチェック
 %% @end
 %%--------------------------------------------------------------------
-add_player_to_room(_WSPidSpawnFun) ->
-  % まず5人
-  PPids1 = [spawnPlayer() || _ <- lists:seq(1, 5)],
-  PStatusList1 = [Status || {Status, _} <- [get_state(PPid) || PPid <- PPids1]],
+add_player_to_room_no_max(_) ->
+  % 5人
+  PPids = [spawnPlayer() || _ <- lists:seq(1, 5)],
+  PStatusList = [Status || {Status, _} <- [get_state(PPid) || PPid <- PPids]],
   IsIdle = fun(State) -> idle =:= State end,
-  [mmmario_player:stop(PPid) || PPid <- PPids1],
-  % 次6人
-  PPids2 = [spawnPlayer() || _ <- lists:seq(1, 6)],
-  PStatusList2 = [Status || {Status, _} <- [get_state(PPid) || PPid <- PPids2]],
-  IsOngame = fun(State) -> ongame =:= State end,
-  [mmmario_player:stop(PPid) || PPid <- PPids2],
-  [?_assert(lists:all(IsIdle, PStatusList1)),
-    ?_assert(lists:all(IsOngame, PStatusList2)),
-    ?_assertEqual(idle, hd(PStatusList1)),
-    ?_assertEqual(ongame, hd(PStatusList2))].
+  [?_assert(lists:all(IsIdle, PStatusList)),
+    ?_assertEqual(idle, hd(PStatusList))].
 
+%%--------------------------------------------------------------------
+%% @doc
+%% プレイヤーの状態がongameになることをチェック
+%% @end
+%%--------------------------------------------------------------------
+add_player_to_room_max(_) ->
+  IsOngame = fun(State) -> ongame =:= State end,
+  % 6人
+  {PUids, PPids} = npuids(6),
+  PStatusList = [Status || {Status, _} <- [get_state(PPid) || PPid <- PPids]],
+  [mmmario_player:die_player(PUid) || PUid <- lists:sublist(PUids, 5)],
+  [?_assert(lists:all(IsOngame, PStatusList)),
+    ?_assertEqual(ongame, hd(PStatusList))].

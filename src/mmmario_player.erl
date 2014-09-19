@@ -13,10 +13,12 @@
 
 %% API
 -export([
+  puid/1,
   start_link/2,
   stop/1,
   ready_player/1,
   move_player/2,
+  die_player/1,
   change_player_name/2
 ]).
 %% gen_fsm callbacks
@@ -57,6 +59,14 @@
 
 %%--------------------------------------------------------------------
 %% @doc
+%% PPidからPUidを取得
+%% @end
+%%--------------------------------------------------------------------
+puid(PPid) ->
+  gen_fsm:sync_send_all_state_event(PPid, puid).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% 開始メソッド
 %% WSServPidはその名の通り、mmmario_wsservのpid
 %% @end
@@ -70,7 +80,7 @@ start_link(WSServPid, Name) ->
 %% @end
 %%--------------------------------------------------------------------
 stop(PPid) ->
-  exit(PPid, normal).
+  gen_fsm:sync_send_all_state_event(PPid, exit).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -78,7 +88,7 @@ stop(PPid) ->
 %% @end
 %%--------------------------------------------------------------------
 ready_player(PUid) ->
-  error_logger:info_msg("~p~n", [PUid]),
+  error_logger:info_msg("ready: ~p~n", [PUid]),
   gen_fsm:send_event(?PPID(PUid), ready).
 
 %%--------------------------------------------------------------------
@@ -88,6 +98,14 @@ ready_player(PUid) ->
 %%--------------------------------------------------------------------
 move_player(PUid, Rect) ->
   gen_fsm:send_event(?PPID(PUid), {move, Rect}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% プレイヤー死亡
+%% @end
+%%--------------------------------------------------------------------
+die_player(PUid) ->
+  gen_fsm:send_event(?PPID(PUid), die).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -154,7 +172,8 @@ ongame({move, Rect}, State = #pstate{uid = PUid, roompid = RPid}) ->
 %% ゲーム状態で死亡
 %% @end
 %%--------------------------------------------------------------------
-ongame(die, State) ->
+ongame(die, State = #pstate{uid = PUid, roompid = RPid}) ->
+  mmmario_room:die_player(RPid, PUid),
   {next_state, postgame, State}.
 
 %%--------------------------------------------------------------------
@@ -167,9 +186,29 @@ ongame(die, State) ->
 handle_event({name, Name}, SName, S) ->
   {next_state, SName, S#pstate{name = Name}}.
 
-handle_sync_event(_Event, _From, SName, S) ->
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 終了
+%% @end
+%%--------------------------------------------------------------------
+handle_sync_event(exit, _From, _SName, State) ->
   Reply = ok,
-  {reply, Reply, SName, S}.
+  {stop, "Exit", Reply, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% PPidからPUidを取得
+%% @end
+%%--------------------------------------------------------------------
+handle_sync_event(ppid, _From, SName, State = #pstate{uid = PUid}) ->
+  Reply = PUid,
+  {reply, Reply, SName, State};
+
+handle_sync_event(_Event, _From, SName, State) ->
+  Reply = ok,
+  {reply, Reply, SName, State}.
 
 handle_info(_Info, SName, S) ->
   {next_state, SName, S}.
