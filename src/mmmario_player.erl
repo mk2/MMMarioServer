@@ -45,7 +45,7 @@
 %% プレイヤー状態
 %% @end
 %%--------------------------------------------------------------------
--record(pstate, {
+-record(playerstate, {
   uid, % プレイヤーのUID {pid(), #ref()}
   name, % プレイヤーの名前
   roompid, % roomのPid
@@ -140,7 +140,7 @@ init([WSServPid, Name]) ->
   RPid = mmmario_room_server:new_player(PUid),
   process_flag(trap_exit, true),
   link(WSServPid),
-  {ok, idle, #pstate{uid = PUid, wsservpid = WSServPid, name = Name, roompid = RPid}}.
+  {ok, idle, #playerstate{uid = PUid, wsservpid = WSServPid, name = Name, roompid = RPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -149,7 +149,7 @@ init([WSServPid, Name]) ->
 %% readyイベントが来たら返答する
 %% @end
 %%--------------------------------------------------------------------
-idle(ready, State = #pstate{roompid = RPid}) ->
+idle(ready, State = #playerstate{roompid = RPid}) ->
   mmmario_room:ready_player(RPid, self()),
   {next_state, ongame, State}.
 
@@ -160,7 +160,7 @@ idle(ready, State = #pstate{roompid = RPid}) ->
 %% 他のプレイヤーのキャラクター位置が変わったので、クライアントへ通知する
 %% @end
 %%--------------------------------------------------------------------
-ongame({rects_change, Rects}, State = #pstate{wsservpid = WSPid}) ->
+ongame({rects_change, Rects}, State = #playerstate{wsservpid = WSPid}) ->
   Text = string:join([rect_to_text(Rect) || Rect <- Rects], "|"),
   mmmario_wsserv:send(WSPid, Text),
   {next_state, ongame, State};
@@ -171,7 +171,7 @@ ongame({rects_change, Rects}, State = #pstate{wsservpid = WSPid}) ->
 %% ゲーム状態
 %% @end
 %%--------------------------------------------------------------------
-ongame({move, Rect}, State = #pstate{uid = PUid, roompid = RPid}) ->
+ongame({move, Rect}, State = #playerstate{uid = PUid, roompid = RPid}) ->
   mmmario_room:move_player(RPid, PUid, Rect),
   {next_state, ongame, State};
 
@@ -181,7 +181,7 @@ ongame({move, Rect}, State = #pstate{uid = PUid, roompid = RPid}) ->
 %% 自分以外のキャラを動かす
 %% @end
 %%--------------------------------------------------------------------
-ongame({move_others, Rects}, State = #pstate{wsservpid = WSSrvPid, uid = PUid, roompid = RPid}) ->
+ongame({move_others, Rects}, State = #playerstate{wsservpid = WSSrvPid}) ->
   Data = "UPD" ++ string:join(rects_to_text(Rects), "|"),
   mmmario_wsserv:send(WSSrvPid, Data),
   {next_state, ongame, State};
@@ -192,7 +192,7 @@ ongame({move_others, Rects}, State = #pstate{wsservpid = WSSrvPid, uid = PUid, r
 %% ゲーム状態で死亡
 %% @end
 %%--------------------------------------------------------------------
-ongame(die, State = #pstate{uid = PUid, roompid = RPid}) ->
+ongame(die, State = #playerstate{uid = PUid, roompid = RPid}) ->
   mmmario_room:die_player(RPid, PUid),
   {next_state, postgame, State}.
 
@@ -204,7 +204,7 @@ ongame(die, State = #pstate{uid = PUid, roompid = RPid}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_event({name, Name}, SName, S) ->
-  {next_state, SName, S#pstate{name = Name}}.
+  {next_state, SName, S#playerstate{name = Name}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -222,7 +222,7 @@ handle_sync_event(exit, _From, _SName, State) ->
 %% PPidからPUidを取得
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(ppid, _From, SName, State = #pstate{uid = PUid}) ->
+handle_sync_event(ppid, _From, SName, State = #playerstate{uid = PUid}) ->
   Reply = PUid,
   {reply, Reply, SName, State};
 
@@ -239,7 +239,7 @@ handle_info(_Info, SName, S) ->
 %% 終了処理関数
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, _SName, #pstate{uid = PUid, roompid = RPid}) ->
+terminate(Reason, _SName, #playerstate{uid = PUid, roompid = RPid}) ->
   error_logger:warning_msg("terminating player with: ~p~n", [Reason]),
   mmmario_room:exit_player(RPid, ?PPID(PUid)),
   ok.
@@ -263,8 +263,8 @@ format_status(normal, [PDict, StatusData]) ->
   io:format("PDict: ~p~n", [PDict]),
   io:format("StatusData: ~p~n", [StatusData]),
   [{data, [
-    {"Name", StatusData#pstate.name},
-    {"Uid", StatusData#pstate.uid}]}].
+    {"Name", StatusData#playerstate.name},
+    {"Uid", StatusData#playerstate.uid}]}].
 
 %%%===================================================================
 %%% Internal functions
