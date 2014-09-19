@@ -115,6 +115,7 @@ send(Pid, Data) ->
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% gen_serverコールバック
 %% @end
@@ -125,6 +126,7 @@ init(LSock) ->
   {ok, #wsservstate{lsock = LSock}}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 同期呼び出し
 %% 今のところ使う予定はないが、内部的にwsservを呼ぶときに使ったほうがよい？
@@ -134,6 +136,7 @@ handle_call(_Request, _From, State) ->
   {ok, State}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 正常なメッセージを裁く関数
 %% ここからメッセージハンドラに流していく
@@ -147,6 +150,7 @@ handle_info(?SOCK(Msg), S = #wsservstate{csock = CSock}) ->
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% エラー処理
 %% といっても終了するだけ
@@ -158,6 +162,7 @@ handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
   {stop, normal, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 未知のメッセージ処理
 %% 無視して別のメッセージを待つ
@@ -168,6 +173,7 @@ handle_info(Msg, S) ->
   {noreply, S}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% eventメッセージをハンドリング
 %% moveイベント
@@ -179,6 +185,7 @@ handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
   {noreply, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% eventメッセージをハンドリング
 %% nameイベント
@@ -190,6 +197,7 @@ handle_cast({event, {name, Name}}, S = #wsservstate{ppid = PPid}) ->
   {noreply, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 未知のイベントをハンドリング
 %% @end
@@ -199,6 +207,7 @@ handle_cast({event, _Unkonwn}, S = #wsservstate{}) ->
   {noreply, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% TCPアクセプトを処理する関数
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
@@ -219,6 +228,7 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   end;
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% テキストメッセージを処理
 %% こっから全てのイベントの処理が始まる…
@@ -236,6 +246,7 @@ handle_cast(
   {noreply, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% クローズメッセージを処理
 %% Socketはterminateの方で閉じる？
@@ -250,6 +261,7 @@ handle_cast(
   {stop, close_request, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% PINGメッセージを処理
 %% PONGを返す
@@ -264,6 +276,7 @@ handle_cast(
   {noreply, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 扱わないOPCODEの場合
 %% @end
@@ -276,6 +289,7 @@ handle_cast(
   {noreply, S};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 任意のデータ送信。send/2経由で使う
 %% 今のところOpCodeはTEXTになる
@@ -291,6 +305,7 @@ handle_cast(
   {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% fallback用handle_cast
 %% @end
@@ -301,6 +316,7 @@ handle_cast(Others, S) ->
   {noreply, S}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% gen_serverコールバック
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
@@ -313,6 +329,7 @@ terminate(Reason, #wsservstate{csock = CSock, ppid = PPid}) ->
   ok.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% gen_serverコールバック
 %% @end
@@ -325,6 +342,7 @@ code_change(OldVsn, State, Extra) ->
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% ハンドシェイク処理
 %% @end
@@ -348,6 +366,7 @@ do_handshake(CSock, Headers) ->
   end.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% ヘッダー情報をまるっと受け取ったらここでヘッダーの内容をチェックし、大丈夫ならsend_handshakeを呼び出して
 %% openingハンドシェイクを送信する
@@ -362,6 +381,7 @@ verify_handshake(CSock, Headers) ->
   send_handshake(CSock, Headers).
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% openingハンドシェイクを送信する
 %% @end
@@ -373,6 +393,7 @@ send_handshake(CSock, Headers) ->
   gen_tcp:send(CSock, AcceptHeader).
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% websocketのアクセプトヘッダの値を作る
 %% @end
@@ -386,6 +407,7 @@ make_accept_header_value(SWKey) ->
   base64:encode_to_string(Digest).
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% websocketのデータフレームをデコード
 %% @end
@@ -393,11 +415,13 @@ make_accept_header_value(SWKey) ->
 decode_ws_dataframe(RawMsg) ->
   <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, OpCode:4, Mask:1, PayloadLen:7, RemainMsg/binary>> = RawMsg,
 
-  if PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_ON ->
-    io:format("PL NORMAL MASK ON~n"),
-    {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainMsg)),
-    #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
-      opcode = OpCode, mask = ?MASK_ON, maskkey = MaskKey, pllen = PayloadLen, data = Data, msg = RawMsg};
+  % データのバイトサイズと、マスクon/offの2条件で分岐させる
+  if
+    PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_ON ->
+      io:format("PL NORMAL MASK ON~n"),
+      {MaskKey, Data} = apply_mask_key(extract_mask_key(RemainMsg)),
+      #wsdataframe{fin = Fin, rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+        opcode = OpCode, mask = ?MASK_ON, maskkey = MaskKey, pllen = PayloadLen, data = Data, msg = RawMsg};
 
     PayloadLen =< ?PAYLOAD_LENGTH_NORMAL, Mask =:= ?MASK_OFF ->
       io:format("PL NORMAL MASK OFF~n"),
@@ -440,6 +464,7 @@ decode_ws_dataframe(RawMsg) ->
 
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% データをwebsocketのデータフレームへエンコード
 %% とりあえずデータは1メッセージに収まるという想定
@@ -458,10 +483,12 @@ encode_ws_dataframe(Data, Opts) ->
                                           _ -> {{undefined, Data}, 2#00000000}
                                         end,
 
-  if DataByteSize =< ?PAYLOAD_LENGTH_NORMAL, MaskKey =:= undefined ->
-    io:format("PL NORMAL MASK OFF~n"),
-    MaskPayloadLength = MaskOnOffBits bor DataByteSize,
-    <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
+  % データのバイトサイズと、マスクon/offの2条件で分岐させる
+  if
+    DataByteSize =< ?PAYLOAD_LENGTH_NORMAL, MaskKey =:= undefined ->
+      io:format("PL NORMAL MASK OFF~n"),
+      MaskPayloadLength = MaskOnOffBits bor DataByteSize,
+      <<FinRsvsOpCode, MaskPayloadLength, NewData/binary>>;
 
     DataByteSize =< ?PAYLOAD_LENGTH_NORMAL ->
       io:format("PL NORMAL MASK ON~n"),
@@ -496,6 +523,7 @@ encode_ws_dataframe(Data, Opts) ->
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% マスクキーの抽出
 %% @end
@@ -505,6 +533,7 @@ extract_mask_key(RawMsg) ->
   {MaskKey, RemainMsg}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 16ビット分のペイロード長を抽出
 %% @end
@@ -514,6 +543,7 @@ extract_extend_payload_length_16(RawMsg) ->
   {Length, RemainMsg}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% 64ビット分のペイロード長を抽出
 %% @end
@@ -523,6 +553,7 @@ extract_extend_payload_length_64(RawMsg) ->
   {Length, RemainMsg}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc
 %% マスクキーの適用
 %% @end
@@ -546,7 +577,6 @@ apply_mask_key(RawMsg, MaskKey) ->
     {Val, Mask} <- lists:zip(RawMsgList, MaskKeyList)]))}.
 %%   {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
 %%     <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawMsg]))}.
-
 
 %%%===================================================================
 %%% テスト関数

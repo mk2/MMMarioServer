@@ -45,27 +45,20 @@
 
 -define(SERVER, ?MODULE).
 
+-include("mmmario_room.hrl").
+
 %%--------------------------------------------------------------------
 %% @doc
 %% 部屋状態レコード
 %% @end
 %%--------------------------------------------------------------------
 -record(roomstate, {
-  tid, % ETSテーブルのID
+  ptid, % プレイヤー情報用ETSテーブルのID
+  empid, % イベントマネージャPID
   pcount = 0, % 部屋にいる(はずの)プレイヤー数
-  rcount = 0, % ゲーム開始直前のプレイヤー数(ゲーム開始以降この属性は固定になる)
-  players = #{} % プレイヤーのUIDリスト, #{PUid => [{state, alive|dead}]}
+  rcount = 0 % ゲーム開始直前のプレイヤー数(ゲーム開始以降この属性は固定になる)
 }).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% キャラクター情報レコード。ETSで使う
-%% @end
-%%--------------------------------------------------------------------
--record(cinfo, {
-  uid, % プレイヤーのUID {pid(), ref()}
-  rect % キャラクターのレクト rect()
-}).
 
 %%%===================================================================
 %%% API
@@ -140,9 +133,10 @@ die_player(RPid, PUid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  Tid = ets:new(?SERVER, [set, {keypos, #cinfo.uid}]),
+  PTid = ets:new(?SERVER, [set, protected, {keypos, #cinfo.uid}, {read_concurrency, true}, {write_concurrency, true}]),
+  EMPid = mmmario_room_event:start_link(),
   process_flag(trap_exit, true),
-  {ok, idle, #roomstate{tid = Tid}}.
+  {ok, idle, #roomstate{ptid = PTid, empid = EMPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -151,21 +145,22 @@ init([]) ->
 %% プレイヤー追加イベントが来たら追加する
 %% @end
 %%--------------------------------------------------------------------
-idle({new_player, PUid}, State = #roomstate{pcount = PCount, players = PUids}) ->
+idle({new_player, PUid}, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   NextPCount = PCount + 1,
-  NextPUids = maps:put(PUid, [{state, alive}], PUids),
+  HandlerId = mmmario_room_event:add_handler(EMPid, PTid, PUid),
+  ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId}),
   if
     MaxPCount =:= NextPCount ->
       error_logger:info_msg("Room[~p] is full of players.~n", [self()]),
       mmmario_room_server:new_state(self(), pregame),
-      notice_ready_player(maps:keys(NextPUids)),
-      {next_state, pregame, State#roomstate{pcount = NextPCount, players = NextPUids}};
+      mmmario_room_event:notice_ready(EMPid),
+      {next_state, pregame, State#roomstate{pcount = NextPCount}};
     0 =< NextPCount andalso MaxPCount > NextPCount ->
-      {next_state, idle, State#roomstate{pcount = NextPCount, players = NextPUids}};
+      {next_state, idle, State#roomstate{pcount = NextPCount}};
     0 > NextPCount orelse MaxPCount < NextPCount ->
       error_logger:error_msg("NextPCount is odd.~n"),
-      true = mmmario_room_server:delete_room(self()),
+      ok = mmmario_room_server:delete_room(self()),
       {stop, "NextPCount is odd.", State}
   end.
 
@@ -197,29 +192,24 @@ pregame({ready_player, _PUid}, State = #roomstate{pcount = PCount, rcount = RCou
 %% 負けたプレイヤーに対応する
 %% @end
 %%--------------------------------------------------------------------
-ongame({die_player, PUid}, State = #roomstate{pcount = PCount, players = PUids}) ->
+ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount}) ->
   NextPCount = PCount - 1,
-  IsKey = maps:is_key(PUid, PUids),
+  IsKey = length(ets:match(PTid, #cinfo{uid = PUid, _ = '_'})) > 0,
   if
     IsKey andalso 1 < NextPCount ->
       error_logger:info_msg("The player [~p] dies.~n", [PUid]),
-      {next_state, ongame, State#roomstate{pcount = NextPCount, players = maps:update(PUid, [{state, dead}], PUids)}};
+      ets:update_element(PTid, PUid, {#cinfo.state, dead}),
+      {next_state, ongame, State#roomstate{pcount = NextPCount}};
     IsKey andalso 1 == NextPCount ->
-      NextPUids = maps:update(PUid, [{state, dead}], PUids),
-      ExtractAlivePlayerFun = fun(K, V, Acc) ->
-        if
-          V =:= [{state, alive}] andalso Acc =:= undefined -> K;
-          true -> Acc
-        end
-      end,
-      AlivePUid = maps:fold(ExtractAlivePlayerFun, undefined, NextPUids),
+      ets:update_element(PTid, PUid, {#cinfo.state, dead}),
+      AlivePUid = hd(ets:match(PTid, #cinfo{state = alive, _ = '_'})),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
       mmmario_room_server:new_state(self(), postgame),
-      {next_state, postgame, State#roomstate{pcount = NextPCount, players = NextPUids}};
+      {next_state, postgame, State#roomstate{pcount = NextPCount}};
     not IsKey -> {next_state, ongame, State};
     0 >= NextPCount ->
-      true = mmmario_room_server:delete_room(self()),
-      {stop, "No body in the room.", State#roomstate{pcount = 0, players = #{}}}
+      ok = mmmario_room_server:delete_room(self()),
+      {stop, "No body in the room.", State#roomstate{pcount = 0}}
   end;
 
 %%--------------------------------------------------------------------
@@ -229,8 +219,19 @@ ongame({die_player, PUid}, State = #roomstate{pcount = PCount, players = PUids})
 %% ので全プレイヤーに通知を行う
 %% @end
 %%--------------------------------------------------------------------
-ongame({move_player, PUid, Rect}, State = #roomstate{tid = Tid}) ->
-  ets:insert(Tid, #cinfo{uid = PUid, rect = Rect}),
+ongame({move_player, PUid, Rect}, State = #roomstate{ptid = PTid}) ->
+  ets:update_element(PTid, PUid, {#cinfo.rect, Rect}),
+  {next_state, ongame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 新しくブロックが生成された時によぶ。通知もする
+%% ちなみにブロックの管理はユーザーごとに行う
+%% @end
+%%--------------------------------------------------------------------
+ongame({change_blocks, PUid, Rects}, State = #roomstate{ptid = PTid}) ->
+  ets:update_element(PTid, PUid, {#cinfo.blocks, Rects}),
   {next_state, ongame, State}.
 
 %%--------------------------------------------------------------------
@@ -249,14 +250,18 @@ postgame({_, _PUid}, State) ->
 %% exit_playerイベントはあらゆる状態で処理する必要がある
 %% @end
 %%--------------------------------------------------------------------
-handle_event({exit_player, PUid}, StateName, State = #roomstate{pcount = PCount, players = PUids}) ->
+handle_event({exit_player, PUid}, StateName, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
   NextPCount = PCount - 1,
+  HandlerId = hd(ets:match(PTid, #cinfo{uid = PUid, hid = '$1', _ = '_'})),
   if
-    0 < NextPCount -> {next_state, StateName, State#roomstate{pcount = NextPCount, players = maps:remove(PUid, PUids)}};
+    0 < NextPCount ->
+      ets:match_delete(PTid, #cinfo{uid = PUid, _ = '_'}),
+      mmmario_room_event:delete_handler(EMPid, HandlerId),
+      {next_state, StateName, State#roomstate{pcount = NextPCount}};
     0 >= NextPCount ->
       error_logger:error_msg("No body in the room[~p]~n", [self()]),
-      true = mmmario_room_server:delete_room(self()),
-      {stop, "No body in the room.", State#roomstate{pcount = 0, players = #{}}}
+      ok = mmmario_room_server:delete_room(self()),
+      {stop, "No body in the room.", State#roomstate{pcount = 0}}
   end.
 
 %%--------------------------------------------------------------------
@@ -265,7 +270,7 @@ handle_event({exit_player, PUid}, StateName, State = #roomstate{pcount = PCount,
 %% stopイベントの処理
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(stop, _From, StateName, State) ->
+handle_sync_event(stop, _From, _StateName, State) ->
   Reply = ok,
   {stop, "Stop room", Reply, State};
 
@@ -285,10 +290,11 @@ handle_info(_Info, StateName, State) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%%
+%% 終了時に呼ばれる。
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _StateName, _State) ->
+terminate(Reason, StateName, _State) ->
+  error_logger:warning_msg("The room[~p] is terminated with reason[~p]. (state is ~p)~n", [self(), Reason, StateName]),
   ok.
 
 %%--------------------------------------------------------------------
@@ -312,26 +318,8 @@ format_status(normal, [PDict, StatusData]) ->
   [{data, [
     {"PCount", StatusData#roomstate.pcount},
     {"RCount", StatusData#roomstate.rcount},
-    {"Players", StatusData#roomstate.players}]}].
+    {"Players", ets:match_object(StatusData#roomstate.ptid, #cinfo{_ = '_'})}]}].
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% プレイヤーにready_playerイベントを送る
-%% @end
-%%--------------------------------------------------------------------
-notice_ready_player(PUids) ->
-  [mmmario_player:ready_player(PUid) || PUid <- PUids].
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% cinfoに変更が生じた時に、変更元以外に全てを通知する
-%% @end
-%%--------------------------------------------------------------------
-notice_cinfo_change_except_origin(PUid) ->
-  ok.

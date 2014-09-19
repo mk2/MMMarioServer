@@ -27,6 +27,9 @@
   y  % Y要素
 }).
 
+% 単位ベクトル
+-define(UNIT_VEC, #vec{x = 1.0, y = 1.0}).
+
 getx(#vec{x = X}) -> X.
 
 gety(#vec{y = Y}) -> Y.
@@ -45,6 +48,9 @@ gety(#vec{y = Y}) -> Y.
   origin, % 原点 vec()
   size    % サイズ vec()
 }).
+
+% 単位レクト
+-define(UNIT_RECT, #rect{origin = ?UNIT_VEC, size = ?UNIT_VEC}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -66,6 +72,14 @@ text_to_rect("R" ++ RawText) ->
 %%--------------------------------------------------------------------
 rect_to_text(#rect{origin = #vec{x = ox, y = oy}, size = #vec{x = sx, y = sy}}) ->
   "R" ++ string:join([ox, oy, sx, sy], ",").
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 複数のレクトをテキストのリストに変換
+%% @end
+%%--------------------------------------------------------------------
+rects_to_text(Rects) ->
+  [rect_to_text(Rect) || Rect <- Rects].
 
 getorigin(#rect{origin = Origin}) -> Origin.
 

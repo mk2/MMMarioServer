@@ -18,6 +18,7 @@
   stop/1,
   ready_player/1,
   move_player/2,
+  move_other_players/2,
   die_player/1,
   change_player_name/2
 ]).
@@ -101,6 +102,14 @@ move_player(PUid, Rect) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% プレイヤー以外の位置を動かす
+%% @end
+%%--------------------------------------------------------------------
+move_other_players(PUid, Rects) ->
+  gen_fsm:send_event(?PPID(PUid), {move_others, Rects}).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% プレイヤー死亡
 %% @end
 %%--------------------------------------------------------------------
@@ -169,6 +178,17 @@ ongame({move, Rect}, State = #pstate{uid = PUid, roompid = RPid}) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
+%% 自分以外のキャラを動かす
+%% @end
+%%--------------------------------------------------------------------
+ongame({move_others, Rects}, State = #pstate{wsservpid = WSSrvPid, uid = PUid, roompid = RPid}) ->
+  Data = "UPD" ++ string:join(rects_to_text(Rects), "|"),
+  mmmario_wsserv:send(WSSrvPid, Data),
+  {next_state, ongame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
 %% ゲーム状態で死亡
 %% @end
 %%--------------------------------------------------------------------
@@ -220,7 +240,7 @@ handle_info(_Info, SName, S) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, _SName, #pstate{uid = PUid, roompid = RPid}) ->
-  io:format("terminating player with: ~p~n", [Reason]),
+  error_logger:warning_msg("terminating player with: ~p~n", [Reason]),
   mmmario_room:exit_player(RPid, ?PPID(PUid)),
   ok.
 

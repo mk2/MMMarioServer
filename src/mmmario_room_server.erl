@@ -166,7 +166,7 @@ handle_call({new_player, PUid}, _From, State) ->
 %%--------------------------------------------------------------------
 handle_call({delete_room, RPid}, _From, State) ->
   ets:delete(?SERVER, RPid),
-  {reply, true, State};
+  {reply, ok, State};
 
 %%--------------------------------------------------------------------
 %% @doc
