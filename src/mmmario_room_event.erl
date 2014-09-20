@@ -18,7 +18,9 @@
   add_handler/3,
   delete_handler/2,
   notice_ready/1,
-  notice_rects/1
+  notice_rects/2,
+  notice_new_block/3,
+  notice_winner/2
 ]).
 
 %% gen_event callbacks
@@ -94,8 +96,24 @@ notice_ready(EMPid) ->
 %% プレイヤーのレクトを通知する
 %% @end
 %%--------------------------------------------------------------------
-notice_rects(EMPid) ->
-  gen_event:notify(EMPid, rects).
+notice_rects(EMPid, SenderPUid) ->
+  gen_event:notify(EMPid, {rects, SenderPUid}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 新しいブロック生成を通知
+%% @end
+%%--------------------------------------------------------------------
+notice_new_block(EMPid, SenderPUid, Rect) ->
+  gen_event:notify(EMPid, {block, SenderPUid, Rect}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 勝利したプレイヤーへ通知
+%% @end
+%%--------------------------------------------------------------------
+notice_winner(EMPid, WinnerPUid) ->
+  gen_event:notify(EMPid, {winner, WinnerPUid}).
 
 %%%===================================================================
 %%% gen_event callbacks
@@ -127,13 +145,38 @@ handle_event(ready, State = #roomevtstate{puid = PUid}) ->
 %% rectsメッセージを送信
 %% @end
 %%--------------------------------------------------------------------
-handle_event(rects, State = #roomevtstate{puid = PUid, ptid = PTid}) ->
-  Rects = lists:flatten(ets:select(PTid, ets:fun2ms(
-    fun(#cinfo{uid = CPUid, rect = Rect}) when CPUid =:= PUid ->
-      Rect
-    end
-  ))),
-  mmmario_player:move_other_players(PUid, Rects),
+handle_event({rects, SenderPUid}, State = #roomevtstate{puid = PUid, ptid = PTid}) when SenderPUid =/= PUid ->
+  NamedRects = ets:select(PTid, ets:fun2ms(
+    fun(#cinfo{name = Name, rect = Rect}) -> {Name, Rect} end
+  )),
+  mmmario_player:move_other_players(PUid, NamedRects),
+  {ok, State};
+handle_event({rects, SenderPUid}, State = #roomevtstate{puid = PUid, ptid = PTid}) when SenderPUid =:= PUid ->
+  {ok, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 新しいブロックが生成されたというメッセージを送信
+%% ブロックを生成したPUid以外に送信
+%% @end
+%%--------------------------------------------------------------------
+handle_event({block, SenderPUid, Rect}, State = #roomevtstate{puid = PUid}) when SenderPUid =/= PUid ->
+  mmmario_player:new_block_from_others(PUid, Rect),
+  {ok, State};
+handle_event({block, SenderPUid, _Rect}, State = #roomevtstate{puid = PUid}) when SenderPUid =:= PUid ->
+  {ok, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 勝利通知
+%% @end
+%%--------------------------------------------------------------------
+handle_event({winner, WinnerPUid}, State = #roomevtstate{puid = PUid}) when WinnerPUid =:= PUid ->
+  mmmario_player:win_player(WinnerPUid),
+  {ok, State};
+handle_event({winner, WinnerPUid}, State = #roomevtstate{puid = PUid}) when WinnerPUid =/= PUid ->
   {ok, State};
 
 handle_event(_Event, State) ->

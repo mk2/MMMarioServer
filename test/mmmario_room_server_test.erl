@@ -51,8 +51,8 @@ cleanup_room_server(SPid) ->
 %% 新規プレイヤー振り分けテスト
 %% @end
 %%--------------------------------------------------------------------
-new_player_to_server(SPid) ->
+new_player_to_server(_SPid) ->
   PUids = [make_ref() || _ <- lists:seq(1, 10)],
-  [mmmario_room_server:new_player(PUid) || PUid <- PUids],
+  [mmmario_room_server:new_player(PUid, "Test") || PUid <- PUids],
   RoomCount = mmmario_room_server:all_room_count(),
   [?_assertEqual(2, RoomCount)].

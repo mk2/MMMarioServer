@@ -16,9 +16,9 @@
 %% @end
 %%--------------------------------------------------------------------
 -record(cinfo, {
-  uid, % プレイヤーのUID {pid(), ref()}
+  uid, % プレイヤーのUID {pid(), Name}
   hid, % イベントハンドラID
+  name, % プレイヤー名 Name
   rect = ?UNIT_RECT, % キャラクターのレクト rect()
-  state = alive, % キャラクターの状態 alive|dead
-  blocks = [] % ユーザーが生成したブロック
+  state = alive % キャラクターの状態 alive|dead
 }).

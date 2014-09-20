@@ -25,7 +25,8 @@
   exit_player/2,
   ready_player/2,
   die_player/2,
-  move_player/3
+  move_player/3,
+  new_block/3
 ]).
 
 %% gen_fsm callbacks
@@ -116,6 +117,14 @@ move_player(RPid, PUid, Rect) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% 新しいブロックを生成
+%% @end
+%%--------------------------------------------------------------------
+new_block(RPid, PUid, Rect) ->
+  gen_fsm:send_event(RPid, {new_block, PUid, Rect}).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% プレイヤーがゲームで死んだ時に呼ぶ関数
 %% @end
 %%--------------------------------------------------------------------
@@ -149,7 +158,7 @@ idle({new_player, PUid}, State = #roomstate{ptid = PTid, empid = EMPid, pcount =
   MaxPCount = application:get_env(mmmario, maxpcount, 6),
   NextPCount = PCount + 1,
   HandlerId = mmmario_room_event:add_handler(EMPid, PTid, PUid),
-  ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId}),
+  ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId, name = element(2, PUid)}),
   if
     MaxPCount =:= NextPCount ->
       error_logger:info_msg("Room[~p] is full of players.~n", [self()]),
@@ -192,9 +201,9 @@ pregame({ready_player, _PUid}, State = #roomstate{pcount = PCount, rcount = RCou
 %% 負けたプレイヤーに対応する
 %% @end
 %%--------------------------------------------------------------------
-ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount}) ->
+ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount, empid = EMPid}) ->
   NextPCount = PCount - 1,
-  IsKey = length(ets:match(PTid, #cinfo{uid = PUid, _ = '_'})) > 0,
+  IsKey = ets:member(PTid, PUid),
   if
     IsKey andalso 1 < NextPCount ->
       error_logger:info_msg("The player [~p] dies.~n", [PUid]),
@@ -202,8 +211,9 @@ ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount}) ->
       {next_state, ongame, State#roomstate{pcount = NextPCount}};
     IsKey andalso 1 == NextPCount ->
       ets:update_element(PTid, PUid, {#cinfo.state, dead}),
-      AlivePUid = hd(ets:match(PTid, #cinfo{state = alive, _ = '_'})),
+      AlivePUid = hd(hd(ets:match(PTid, #cinfo{state = alive, uid = '$1', _ = '_'}))),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
+      mmmario_room_event:notice_winner(EMPid, AlivePUid),
       mmmario_room_server:new_state(self(), postgame),
       {next_state, postgame, State#roomstate{pcount = NextPCount}};
     not IsKey -> {next_state, ongame, State};
@@ -219,19 +229,19 @@ ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount}) ->
 %% ので全プレイヤーに通知を行う
 %% @end
 %%--------------------------------------------------------------------
-ongame({move_player, PUid, Rect}, State = #roomstate{ptid = PTid}) ->
+ongame({move_player, PUid, Rect}, State = #roomstate{ptid = PTid, empid = EMPid}) ->
   ets:update_element(PTid, PUid, {#cinfo.rect, Rect}),
+  mmmario_room_event:notice_rects(EMPid, PUid),
   {next_state, ongame, State};
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
 %% 新しくブロックが生成された時によぶ。通知もする
-%% ちなみにブロックの管理はユーザーごとに行う
 %% @end
 %%--------------------------------------------------------------------
-ongame({change_blocks, PUid, Rects}, State = #roomstate{ptid = PTid}) ->
-  ets:update_element(PTid, PUid, {#cinfo.blocks, Rects}),
+ongame({new_block, PUid, Rect}, State = #roomstate{empid = EMPid}) ->
+  mmmario_room_event:notice_new_block(EMPid, PUid, Rect),
   {next_state, ongame, State}.
 
 %%--------------------------------------------------------------------
@@ -252,12 +262,18 @@ postgame({_, _PUid}, State) ->
 %%--------------------------------------------------------------------
 handle_event({exit_player, PUid}, StateName, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
   NextPCount = PCount - 1,
-  HandlerId = hd(ets:match(PTid, #cinfo{uid = PUid, hid = '$1', _ = '_'})),
+  HandlerId = hd(hd(ets:match(PTid, #cinfo{uid = PUid, hid = '$1', _ = '_'}))),
+  mmmario_room_event:delete_handler(EMPid, HandlerId),
+  ets:match_delete(PTid, #cinfo{uid = PUid, _ = '_'}),
   if
-    0 < NextPCount ->
-      ets:match_delete(PTid, #cinfo{uid = PUid, _ = '_'}),
-      mmmario_room_event:delete_handler(EMPid, HandlerId),
+    1 < NextPCount ->
       {next_state, StateName, State#roomstate{pcount = NextPCount}};
+    ongame =:= StateName andalso 1 =:= NextPCount ->
+      AlivePUid = hd(hd(ets:match(PTid, #cinfo{state = alive, uid = '$1', _ = '_'}))),
+      error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
+      mmmario_room_event:notice_winner(EMPid, AlivePUid),
+      mmmario_room_server:new_state(self(), postgame),
+      {next_state, postgame, State#roomstate{pcount = NextPCount}};
     0 >= NextPCount ->
       error_logger:error_msg("No body in the room[~p]~n", [self()]),
       ok = mmmario_room_server:delete_room(self()),

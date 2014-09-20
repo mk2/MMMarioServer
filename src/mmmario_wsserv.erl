@@ -15,9 +15,20 @@
 -ifndef(DEBUG).
 %% APIs
 %% 公開API
--export([start_link/1, send/2]).
+-export([
+  start_link/1,
+  send/2,
+  send_close/1
+]).
 %% gen_serverコールバックAPI
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([
+  init/1,
+  handle_call/3,
+  handle_cast/2,
+  handle_info/2,
+  terminate/2,
+  code_change/3
+]).
 -else.
 %% デバッグ用エクスポート
 -compile([debug_info, export_all]).
@@ -86,7 +97,7 @@
 -record(wsservstate, {
   lsock,
   csock,
-  ppid, % Player FSMのPid
+  puid, % Player FSMのUID :: {pid(), ref()}
   wsdataframe = #wsdataframe{}
 }).
 
@@ -105,10 +116,19 @@ start_link(LSock) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% データ送信メソッド
+%% 送るデータは全てテキストと想定
 %% @end
 %%--------------------------------------------------------------------
-send(Pid, Data) ->
-  gen_server:cast(Pid, {data, Data}).
+send(WSSPid, TextData) ->
+  gen_server:cast(WSSPid, {data, list_to_binary(TextData)}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% クローズフレームを送信
+%% @end
+%%--------------------------------------------------------------------
+send_close(WSSPid) ->
+  gen_server:cast(WSSPid, close).
 
 %%%===================================================================
 %%% gen_server コールバック
@@ -142,12 +162,12 @@ handle_call(_Request, _From, State) ->
 %% ここからメッセージハンドラに流していく
 %% @end
 %%--------------------------------------------------------------------
-handle_info(?SOCK(Msg), S = #wsservstate{csock = CSock}) ->
+handle_info(?SOCK(Msg), State = #wsservstate{csock = CSock}) ->
   WSDataFrame = decode_ws_dataframe(Msg),
   io:format("received dataframe: ~p~n", [WSDataFrame]),
   gen_server:cast(self(), {wsrequest, WSDataFrame}),
   inet:setopts(CSock, [{active, once}]),
-  {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
+  {noreply, State#wsservstate{wsdataframe = WSDataFrame}};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -156,10 +176,10 @@ handle_info(?SOCK(Msg), S = #wsservstate{csock = CSock}) ->
 %% といっても終了するだけ
 %% @end
 %%--------------------------------------------------------------------
-handle_info({tcp_closed, _CSock}, S = #wsservstate{}) ->
-  {stop, normal, S};
-handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
-  {stop, normal, S};
+handle_info({tcp_closed, _CSock}, State = #wsservstate{}) ->
+  {stop, normal, State};
+handle_info({tcp_error, _CSock, _}, State = #wsservstate{}) ->
+  {stop, normal, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -168,9 +188,9 @@ handle_info({tcp_error, _CSock, _}, S = #wsservstate{}) ->
 %% 無視して別のメッセージを待つ
 %% @end
 %%--------------------------------------------------------------------
-handle_info(Msg, S) ->
-  error_logger:format("unexpected msg: ~p~n", [Msg]),
-  {noreply, S}.
+handle_info(Msg, State) ->
+  error_logger:error_msg("unexpected msg: ~p~n", [Msg]),
+  {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -179,10 +199,22 @@ handle_info(Msg, S) ->
 %% moveイベント
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
-  io:format("move request~n"),
-  mmmario:move_player(PPid, Args),
-  {noreply, S};
+handle_cast({event, {move, Rect}}, State = #wsservstate{puid = PUid}) ->
+  error_logger:info_msg("move request~n"),
+  mmmario_player:move_player(PUid, Rect),
+  {noreply, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% eventメッセージをハンドリング
+%% blockイベント
+%% @end
+%%--------------------------------------------------------------------
+handle_cast({event, {block, Rect}}, State = #wsservstate{puid = PUid}) ->
+  error_logger:info_msg("block request~n"),
+  mmmario_player:new_block(PUid, Rect),
+  {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -191,10 +223,21 @@ handle_cast({event, {move, Args}}, S = #wsservstate{ppid = PPid}) ->
 %% nameイベント
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({event, {name, Name}}, S = #wsservstate{ppid = PPid}) ->
-  io:format("name request~n"),
-  mmmario:change_player_name(PPid, Name),
-  {noreply, S};
+handle_cast({event, {name, Name}}, State = #wsservstate{puid = PUid}) ->
+  error_logger:info_msg("name request~n"),
+  mmmario_player:change_player_name(PUid, Name),
+  {noreply, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 死亡メッセージをハンドリング
+%% @end
+%%--------------------------------------------------------------------
+handle_cast({event, die}, State = #wsservstate{puid = PUid}) ->
+  error_logger:info_msg("die request~n"),
+  mmmario_player:die_player(PUid),
+  {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -202,9 +245,9 @@ handle_cast({event, {name, Name}}, S = #wsservstate{ppid = PPid}) ->
 %% 未知のイベントをハンドリング
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({event, _Unkonwn}, S = #wsservstate{}) ->
-  io:format("unknown event request: ~p~n", [_Unkonwn]),
-  {noreply, S};
+handle_cast({event, _Unkonwn}, State = #wsservstate{}) ->
+  error_logger:error_msg("unknown event request: ~p~n", [_Unkonwn]),
+  {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -213,7 +256,7 @@ handle_cast({event, _Unkonwn}, S = #wsservstate{}) ->
 %% TCPアクセプトが完了するまで待ち、その後ハンドシェイク処理を行った後クライアントループを起動。
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
+handle_cast(accept, State = #wsservstate{lsock = LSock}) ->
   io:format("waiting for connection.~n"),
   {ok, CSock} = gen_tcp:accept(LSock),
   % 別のwsservを１個起動しておく
@@ -221,10 +264,10 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
   case do_handshake(CSock, maps:new()) of
     {ok, _} -> io:format("handshake passed.~n"),
       inet:setopts(CSock, [{packet, raw}, {active, once}]), % ハンドシェイクが終わったらアクティブモードで起動
-      {ok, PPid} = mmmario:new_player(self(), ""), % キャラクターのFSMを起動しておく
-      {noreply, S#wsservstate{csock = CSock, ppid = PPid}};
-    {stop, Reason, _} -> {stop, Reason, S};
-    _ -> {stop, "failed handshake with unknown reason", S}
+      {ok, PUid} = mmmario:new_player(self(), "DUMMY"), % キャラクターのFSMを起動しておく
+      {noreply, State#wsservstate{csock = CSock, puid = PUid}};
+    {stop, Reason, _} -> {stop, Reason, State};
+    _ -> {stop, "failed handshake with unknown reason", State}
   end;
 
 %%--------------------------------------------------------------------
@@ -236,14 +279,14 @@ handle_cast(accept, S = #wsservstate{lsock = LSock}) ->
 %%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
-    S = #wsservstate{csock = CSock}
+    State = #wsservstate{}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_TEXT ->
   Data = WSDataFrame#wsdataframe.data,
   io:format("dataframe: ~p~n", [WSDataFrame]),
   io:format("text data received: ~p~n", [Data]),
   Events = mmmario_event_helper:text_to_events(binary:bin_to_list(Data)), % イベントに変換したあと全部投げる
   [gen_server:cast(self(), {event, Event}) || Event <- Events],
-  {noreply, S};
+  {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -254,11 +297,11 @@ handle_cast(
 %%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
-    S = #wsservstate{csock = CSock}
+    State = #wsservstate{csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_CLOSE ->
   io:format("close request received~n"),
   gen_tcp:close(CSock),
-  {stop, close_request, S};
+  {stop, close_request, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -269,11 +312,11 @@ handle_cast(
 %%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
-    S = #wsservstate{csock = CSock}
+    State = #wsservstate{csock = CSock}
 ) when WSDataFrame#wsdataframe.opcode =:= ?OPCODE_PING ->
   io:format("ping request received~n"),
   gen_tcp:send(CSock, encode_ws_dataframe("", #{opcode => ?OPCODE_PONG})),
-  {noreply, S};
+  {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -283,10 +326,10 @@ handle_cast(
 %%--------------------------------------------------------------------
 handle_cast(
     {wsrequest, WSDataFrame},
-    S = #wsservstate{}
+    State = #wsservstate{}
 ) ->
   error_logger:format("no handler for: ~p~n", [WSDataFrame]),
-  {noreply, S};
+  {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @private
@@ -297,12 +340,28 @@ handle_cast(
 %%--------------------------------------------------------------------
 handle_cast(
     {data, Data},
-    S = #wsservstate{csock = CSock}
+    State = #wsservstate{csock = CSock}
 ) ->
-  io:format("data will be sent: ~p~n", [Data]),
-  WSDataFrame = encode_ws_dataframe(Data, #{}),
+  error_logger:info_msg("Data will be sent: ~p~n", [Data]),
+  WSDataFrame = encode_ws_dataframe(Data, #{opcode => ?OPCODE_TEXT}),
   gen_tcp:send(CSock, WSDataFrame),
-  {noreply, S#wsservstate{wsdataframe = WSDataFrame}};
+  {noreply, State#wsservstate{wsdataframe = WSDataFrame}};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% クローズフレームを送信する
+%% @end
+%%--------------------------------------------------------------------
+handle_cast(
+    close,
+    State = #wsservstate{csock = CSock}
+) ->
+  error_logger:warning_msg("Close frame will be sent.~n"),
+  WSDataFrame = encode_ws_dataframe("", #{opcode => ?OPCODE_CLOSE}),
+  gen_tcp:send(CSock, WSDataFrame),
+  {noreply, State#wsservstate{wsdataframe = WSDataFrame}};
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -310,10 +369,10 @@ handle_cast(
 %% fallback用handle_cast
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(Others, S) ->
-  io:format("unexpected casting: ~p~n", [Others]),
-  io:format("wsserv state: ~p~n", [S]),
-  {noreply, S}.
+handle_cast(Others, State) ->
+  error_logger:error_msg("unexpected casting: ~p~n", [Others]),
+  error_logger:error_msg("wsserv state: ~p~n", [State]),
+  {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -322,10 +381,10 @@ handle_cast(Others, S) ->
 %% クライアントブラウザが閉じて強制的に終了する場合はここが呼ばれる
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, #wsservstate{csock = CSock, ppid = PPid}) ->
+terminate(Reason, #wsservstate{csock = CSock, puid = PUid}) ->
   io:format("terminating wsserv with: ~p~n", [Reason]),
   gen_tcp:close(CSock),
-  mmmario:exit_player(PPid),
+  mmmario:exit_player(PUid),
   ok.
 
 %%--------------------------------------------------------------------
@@ -334,7 +393,7 @@ terminate(Reason, #wsservstate{csock = CSock, ppid = PPid}) ->
 %% gen_serverコールバック
 %% @end
 %%--------------------------------------------------------------------
-code_change(OldVsn, State, Extra) ->
+code_change(_OldVsn, _State, _Extra) ->
   erlang:error(not_implemented).
 
 %%%===================================================================
@@ -474,13 +533,15 @@ encode_ws_dataframe(Data, Opts) ->
   DataByteSize = byte_size(Data),
   FinRsvsOpCode = case maps:find(opcode, Opts) of
                     {ok, ?OPCODE_PONG} -> 2#10000000 bor ?OPCODE_PONG;
+                    {ok, ?OPCODE_CLOSE} -> 2#10000000 bor ?OPCODE_CLOSE;
                     _Other -> 2#10000000 bor ?OPCODE_TEXT
                   end,
 
   {{MaskKey, NewData}, MaskOnOffBits} = case maps:find(mask, Opts) of
                                           {ok, aMaskKey} ->
                                             {apply_mask_key(Data, aMaskKey), 2#10000000};
-                                          _ -> {{undefined, Data}, 2#00000000}
+                                          _ ->
+                                            {{undefined, Data}, 2#00000000}
                                         end,
 
   % データのバイトサイズと、マスクon/offの2条件で分岐させる

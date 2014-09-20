@@ -20,7 +20,10 @@
   move_player/2,
   move_other_players/2,
   die_player/1,
-  change_player_name/2
+  new_block/2,
+  new_block_from_others/2,
+  change_player_name/2,
+  win_player/1
 ]).
 %% gen_fsm callbacks
 -export([
@@ -46,7 +49,7 @@
 %% @end
 %%--------------------------------------------------------------------
 -record(playerstate, {
-  uid, % プレイヤーのUID {pid(), #ref()}
+  uid, % プレイヤーのUID {pid(), Name}
   name, % プレイヤーの名前
   roompid, % roomのPid
   wsservpid, % wsservのPid
@@ -105,8 +108,8 @@ move_player(PUid, Rect) ->
 %% プレイヤー以外の位置を動かす
 %% @end
 %%--------------------------------------------------------------------
-move_other_players(PUid, Rects) ->
-  gen_fsm:send_event(?PPID(PUid), {move_others, Rects}).
+move_other_players(PUid, NamedRects) ->
+  gen_fsm:send_event(?PPID(PUid), {move_others, NamedRects}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -118,11 +121,35 @@ die_player(PUid) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% 新しいブロック生成
+%% @end
+%%--------------------------------------------------------------------
+new_block(PUid, Rect) ->
+  gen_fsm:send_event(?PPID(PUid), {new_block, Rect}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 他のプレイヤーが新しくブロック生成
+%% @end
+%%--------------------------------------------------------------------
+new_block_from_others(PUid, Rect) ->
+  gen_fsm:send_event(?PPID(PUid), {new_block_from_others, Rect}).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% 名前変更を行う
 %% @end
 %%--------------------------------------------------------------------
 change_player_name(PUid, Name) ->
   gen_fsm:send_all_state_event(?PPID(PUid), {name, Name}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 勝利通知を行う
+%% @end
+%%--------------------------------------------------------------------
+win_player(PUid) ->
+  gen_fsm:send_event(?PPID(PUid), win).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -136,7 +163,7 @@ change_player_name(PUid, Name) ->
 %% @end
 %%--------------------------------------------------------------------
 init([WSServPid, Name]) ->
-  PUid = {self(), make_ref()},
+  PUid = {self(), Name},
   RPid = mmmario_room_server:new_player(PUid),
   process_flag(trap_exit, true),
   link(WSServPid),
@@ -157,6 +184,7 @@ idle(ready, State = #playerstate{roompid = RPid}) ->
 %% @private
 %% @doc
 %% ゲーム状態
+%% キャラクターの移動を受け取る
 %% @end
 %%--------------------------------------------------------------------
 ongame({move, Rect}, State = #playerstate{uid = PUid, roompid = RPid}) ->
@@ -169,8 +197,39 @@ ongame({move, Rect}, State = #playerstate{uid = PUid, roompid = RPid}) ->
 %% 自分以外のキャラを動かす
 %% @end
 %%--------------------------------------------------------------------
-ongame({move_others, Rects}, State = #playerstate{wsservpid = WSSrvPid}) ->
-  Data = "UPD" ++ string:join(rects_to_text(Rects), "|"),
+ongame({move_others, NamedRects}, State = #playerstate{wsservpid = WSSrvPid}) ->
+  Data = "REC " ++ string:join(namedrects_to_text(NamedRects), " "),
+  mmmario_wsserv:send(WSSrvPid, Data),
+  {next_state, ongame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 新しいブロック生成通知
+%% @end
+%%--------------------------------------------------------------------
+ongame({new_block, Rect}, State = #playerstate{uid = PUid, roompid = RPid}) ->
+  mmmario_room:new_block(RPid, PUid, Rect),
+  {next_state, ongame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 勝利通知
+%% @end
+%%--------------------------------------------------------------------
+ongame(win, State = #playerstate{wsservpid = WSSrvPid}) ->
+  mmmario_wsserv:send(WSSrvPid, "WIN"),
+  {next_state, postgame, State};
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 他のプレイヤーが生成したブロックをクライアントに通知する
+%% @end
+%%--------------------------------------------------------------------
+ongame({new_block_from_others, Rect}, State = #playerstate{wsservpid = WSSrvPid}) ->
+  Data = "BLK " ++ rect_to_text(Rect),
   mmmario_wsserv:send(WSSrvPid, Data),
   {next_state, ongame, State};
 
@@ -229,7 +288,7 @@ handle_info(_Info, SName, S) ->
 %%--------------------------------------------------------------------
 terminate(Reason, _SName, #playerstate{uid = PUid, roompid = RPid}) ->
   error_logger:warning_msg("terminating player with: ~p~n", [Reason]),
-  mmmario_room:exit_player(RPid, ?PPID(PUid)),
+  mmmario_room:exit_player(RPid, PUid),
   ok.
 
 %%--------------------------------------------------------------------

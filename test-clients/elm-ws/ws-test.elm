@@ -12,7 +12,7 @@ import Debug (log)
 
 -- リクエストURL
 -- url = "ws://echo.websocket.org"
-url = "ws://localhost:8080"
+url = "ws://localhost:8081"
 
 {--------------
 ユーザー入力周り

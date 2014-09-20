@@ -10,8 +10,6 @@
 %%%-------------------------------------------------------------------
 -author("lycaon").
 
--compile([export_all]).
-
 %%====================================================================
 %% ベクトル周りの関数
 %%====================================================================
@@ -28,7 +26,10 @@
 }).
 
 % 単位ベクトル
--define(UNIT_VEC, #vec{x = 1.0, y = 1.0}).
+-define(UNIT_VEC, #vec{x = 1, y = 1}).
+
+% ゼロベクトル
+-define(ZERO_VEC, #vec{x = 0, y = 0}).
 
 getx(#vec{x = X}) -> X.
 
@@ -52,17 +53,18 @@ gety(#vec{y = Y}) -> Y.
 % 単位レクト
 -define(UNIT_RECT, #rect{origin = ?UNIT_VEC, size = ?UNIT_VEC}).
 
+% ゼロレクト
+-define(ZERO_RECT, #rect{origin = ?ZERO_VEC, size = ?ZERO_VEC}).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% テキストをrectレコードに変換
 %% ex: "R5,4,3,2" -> #rect{origin = #vec{x = 5, y = 4}, size = #vec{x = 3, y = 2}}
 %% @end
 %%--------------------------------------------------------------------
-text_to_rect("r" ++ RawText) ->
-  text_to_rect("R" ++ RawText);
 text_to_rect("R" ++ RawText) ->
   [{X, _}, {Y, _}, {W, _}, {H, _} | _] = lists:map(fun(Txt) -> string:to_integer(Txt) end, string:tokens(RawText, ",")),
-  #rect{origin = #vec{x = x, y = Y}, size = #vec{x = W, y = Y}}.
+  #rect{origin = #vec{x = X, y = Y}, size = #vec{x = W, y = H}}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -70,8 +72,26 @@ text_to_rect("R" ++ RawText) ->
 %% ex: #rect{origin = #vec{x = 5, y = 4}, size = #vec{x = 3, y = 2}} -> "R5,4,3,2"
 %% @end
 %%--------------------------------------------------------------------
-rect_to_text(#rect{origin = #vec{x = ox, y = oy}, size = #vec{x = sx, y = sy}}) ->
-  "R" ++ string:join([ox, oy, sx, sy], ",").
+rect_to_text(#rect{origin = Origin, size = Size}) ->
+  lists:flatten([
+    "R",
+    integer_to_list(Origin#vec.x),
+    ",",
+    integer_to_list(Origin#vec.y),
+    ",",
+    integer_to_list(Size#vec.x),
+    ",",
+    integer_to_list(Size#vec.y)
+  ]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% {"TeST", #rect()}のような形式になっているレクトをテキストに変換
+%% "TeST R20,20,20,20"みたいになる
+%% @end
+%%--------------------------------------------------------------------
+namedrect_to_text({Name, Rect}) ->
+  Name ++ "-" ++ rect_to_text(Rect).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -80,6 +100,14 @@ rect_to_text(#rect{origin = #vec{x = ox, y = oy}, size = #vec{x = sx, y = sy}}) 
 %%--------------------------------------------------------------------
 rects_to_text(Rects) ->
   [rect_to_text(Rect) || Rect <- Rects].
+
+%%--------------------------------------------------------------------
+%% @doc
+%% [{"test", #rect()}+]のような形式になっているレクトをテキストのリストに変換
+%% @end
+%%--------------------------------------------------------------------
+namedrects_to_text(NamedRects) ->
+  [namedrect_to_text(NamedRect) || NamedRect <- NamedRects].
 
 getorigin(#rect{origin = Origin}) -> Origin.
 

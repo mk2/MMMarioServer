@@ -46,13 +46,13 @@ init([]) ->
   WSServSup = {mmmario_wsserv_sup, {mmmario_wsserv_sup, start_link, []},
     Restart, Shutdown, supervisor, [mmmario_wsserv_sup]},
 
-  EvtMgr = {{local, mmmario_game_event_handler}, {mmmario_game_event_handler, start_link, []},
-    Restart, Shutdown, supervisor, [mmmario_event_handler]},
-
   RoomSup = {mmmario_room_sup, {mmmario_room_sup, start_link, []},
     Restart, Shutdown, supervisor, [mmmario_room_sup]},
 
-  {ok, {SupFlags, [PlayerSup, WSServSup, EvtMgr, RoomSup]}}.
+  RoomServ = {mmmario_room_server, {mmmario_room_server, start_link, []},
+    Restart, Shutdown, supervisor, [mmmario_room_server]},
+
+  {ok, {SupFlags, [PlayerSup, WSServSup, RoomSup, RoomServ]}}.
 
 %%%===================================================================
 %%% Internal functions

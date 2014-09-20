@@ -10,27 +10,45 @@
 -behaviour(application).
 -author("lycaon").
 
--ifndef(DEBUG).
 %% API
--export([start/2, stop/1, new_player/2, exit_player/1, move_player/2, change_player_name/2]).
--else.
--compile([debug_info, export_all]).
--endif.
+-export([
+  start/2,
+  stop/1,
+  new_player/2,
+  exit_player/1
+]).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 全ての親であるmmmarioスーパーバイザーを開始する
+%% @end
+%%--------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
   mmmario_sup:start_link().
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 停止。でも何もしない
+%% @end
+%%--------------------------------------------------------------------
 stop(_State) ->
   ok.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 新しいプレイヤー
+%% PUid :: {pid(), ref()} を返す
+%% @end
+%%--------------------------------------------------------------------
 new_player(WSServPid, Name) ->
-  mmmario_player_sup:start_player(WSServPid, Name).
+  {ok, PPid} = mmmario_player_sup:start_player(WSServPid, Name),
+  {ok, mmmario_player:puid(PPid)}.
 
-exit_player(PPid) ->
+%%--------------------------------------------------------------------
+%% @doc
+%% プレイヤーを終了
+%% @end
+%%--------------------------------------------------------------------
+exit_player(PUid) ->
+  {PPid, _} = PUid,
   mmmario_player_sup:exit_player(PPid).
-
-move_player(PPid, Pos = {_, _}) ->
-  mmmario_player:move_player(PPid, Pos).
-
-change_player_name(PPid, Name) ->
-  mmmario_player:change_player_name(PPid, Name).
