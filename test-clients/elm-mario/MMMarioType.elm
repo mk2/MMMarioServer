@@ -6,6 +6,8 @@ data RenderType = RChara | RBlock | RItem
 
 data StageTile = None | Cloud | Ground
 
+data StateName = Idle | Ongame | Postgame
+
 type UserInput = {
                    arr : {x : Int, y : Int}
                  , space : Bool
@@ -26,6 +28,7 @@ type Chara = {
 
 type GameState = {
                    self : Chara
+                 , stateName : StateName
                  , ellapsedSeconds : Float
                  , blockGenInterval : Float
                  , blocks : [Rect]

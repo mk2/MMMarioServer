@@ -66,10 +66,11 @@ npuids(N) ->
 %% @end
 %%--------------------------------------------------------------------
 player_test_() ->
-  Ins = fun(SetupData) ->
-    add_player_to_room_max(SetupData)
-  end,
-  {setup, fun setup_misc/0, fun cleanup_misc/1, Ins}.
+  Ins = [
+    fun add_player_to_room_max/1,
+    fun add_player_to_room_no_max/1
+  ],
+  {foreach, fun setup_misc/0, fun cleanup_misc/1, Ins}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -110,8 +111,7 @@ add_player_to_room_no_max(_) ->
 add_player_to_room_max(_) ->
   IsOngame = fun(State) -> ongame =:= State end,
   % 6人
-  {PUids, PPids} = npuids(6),
+  PPids = [spawnPlayer() || _ <- lists:seq(1, 6)],
   PStatusList = [Status || {Status, _} <- [get_state(PPid) || PPid <- PPids]],
-  [mmmario_player:die_player(PUid) || PUid <- lists:sublist(PUids, 5)],
   [?_assert(lists:all(IsOngame, PStatusList)),
     ?_assertEqual(ongame, hd(PStatusList))].

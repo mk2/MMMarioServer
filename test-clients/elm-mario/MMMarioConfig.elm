@@ -19,11 +19,11 @@ gndColor = rgb 188 118 71
 linColor = rgb 200 200 200
 
 -- ゲームのFPS
-gameFps = 60
+gameFps = 30
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
-requestFps = 60
+requestFps = 20
 
 -- マリオ画像の幅(px)
 marioImageWidth = 20
@@ -75,6 +75,7 @@ initialGameState = {
                                            , imagePoseName <- "stand"
                                            , imageDireName <- "right"
                                            }
+                   , stateName = Idle
                    , sendData = ""
                    , ellapsedSeconds = 0.0
                    , blockGenInterval = 0.0

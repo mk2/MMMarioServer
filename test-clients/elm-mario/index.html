@@ -71,14 +71,14 @@
         mmmarioClient.ports.wsRecvData.send(e.data);
     };
 
-    ws.onopen = function(e) {
+    ws.onopen = function (e) {
         console.log('WebSocket connect is open.');
 
         var name = 'MARIO' + (+new Date());
-        ws.send('N' + name); // 名前（タイムスタンプを送信）
+        ws.send('NAM ' + name); // 名前（タイムスタンプを送信）
         mmmarioClient.ports.clientName.send(name)
 
-        mmmarioClient.ports.wsSendData.subscribe(function(data) {
+        mmmarioClient.ports.wsSendData.subscribe(function (data) {
             ws.send(data);
         });
     };

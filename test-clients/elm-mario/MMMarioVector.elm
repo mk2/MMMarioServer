@@ -1,5 +1,9 @@
 module MMMarioVector where
 
+import String as S
+import Array
+import Maybe
+
 {-| ベクター関連のモジュール
     Rect系もここに押し込んどく
 
@@ -40,6 +44,11 @@ type Rect = {
  -}
 vec : (Int, Int) -> Vec
 vec (x, y) = (toFloat x, toFloat y)
+
+vecstr : (String, String) -> Vec
+vecstr  (rawx, rawy) =
+    let tofloat = \i -> maybe 0.0 (\j -> j) . S.toFloat
+    in (tofloat rawx, tofloat rawy)
 
 {-| ゼロベクトル -}
 zeroVec : Vec
@@ -204,6 +213,26 @@ moveRect mvec rect = { rect | origin <- addVec mvec rect.origin }
 -- レクトをリサイズ
 resizeRect : Vec -> Rect -> Rect
 resizeRect newsize rect = { rect | size <- newsize }
+
+{-| レクトを文字列化
+ -}
+rectToString : Rect -> String
+rectToString rect = "R"
+     ++ (S.show . getx <| rect.origin)
+     ++ "," ++ (S.show . gety <| rect.origin)
+     ++ "," ++ (S.show . getx <| rect.size)
+     ++ "," ++ (S.show . gety <| rect.size)
+
+{-| 文字列からレクトを作成する
+ -}
+stringToRect : String -> Nothing Rect
+stringToRect rawRectStr =
+    let unconsRectStr = S.uncons rawRectStr
+        createRect = \vals -> {origin = vecstr (Array.getOrElse "0" 0 vals) (Array.getOrElse "0" 1 vals),
+                               size = vecstr (Array.getOrElse "0" 2 vals) (Array.getOrElse "0" 3 vals)}
+    in case unconsRectStr of
+        Nothing -> Nothing
+        ('R', rectStr) -> createRect <| Array.fromList <| S.split "," rectStr
 
 {-| レクトをベクトルでクランプ
  -}

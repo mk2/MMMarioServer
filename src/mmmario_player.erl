@@ -176,7 +176,8 @@ init([WSServPid, Name]) ->
 %% readyイベントが来たら返答する
 %% @end
 %%--------------------------------------------------------------------
-idle(ready, State = #playerstate{roompid = RPid}) ->
+idle(ready, State = #playerstate{wsservpid = WSSrvPid, roompid = RPid}) ->
+  mmmario_wsserv:send(WSSrvPid, "RED"),
   mmmario_room:ready_player(RPid, self()),
   {next_state, ongame, State}.
 
