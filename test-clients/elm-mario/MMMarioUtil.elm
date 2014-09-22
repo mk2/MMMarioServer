@@ -1,21 +1,30 @@
 module MMMarioUtil where
 
-import MMMarioVector (..)
-import MMMarioType (..)
-import MMMarioConfig (..)
 import Array
 import String (split, show, toFloat)
 
--- lのリストをnつずつのリストに分解する
+import MMMarioVector (..)
+import MMMarioType (..)
+import MMMarioConfig (..)
+
+{-| 色々なところで使うユーティリティ関数
+
+# リスト周り
+@doc takeCycle
+
+# WebSocket通信周り
+ -}
+
+{-| あるリストをnつずつのリストに分解する
+
+    takeCycle 2 [1, 2, 3, 4, 5] == [[1, 2], [3, 4]]
+    takeCycle 2 [1, 2, 3, 4, 5, 6] == [[1, 2], [3, 4], [5, 6]]
+ -}
 takeCycle n l =  takeCycle' n l []
 takeCycle' n l accum =
     let notEnough = (length l) < n
     in  if | notEnough -> accum
            | otherwise -> takeCycle' n (drop n l) (accum ++ [take n l])
-
--- round関数とabs関数を一度に
-absRound = round . abs
-
 
 convPosToSend : Chara -> String
 convPosToSend m =

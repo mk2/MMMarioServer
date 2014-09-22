@@ -22,6 +22,18 @@ import Maybe
  -}
 
 -- ================================================================
+-- ユーティリティ関数
+-- ================================================================
+
+{-| 四捨五入して絶対値を取る
+
+    absRound 10.5 == 11
+    absRound -10.5 == 11
+ -}
+absRound : Float -> Int
+absRound = abs . round
+
+-- ================================================================
 -- 型宣言
 -- ================================================================
 
@@ -45,9 +57,13 @@ type Rect = {
 vec : (Int, Int) -> Vec
 vec (x, y) = (toFloat x, toFloat y)
 
+{-| コンストラクタ。StringのタプルからVecを生成
+
+    vecstr ("1", "2") == (1.0, 2.0)
+ -}
 vecstr : (String, String) -> Vec
 vecstr  (rawx, rawy) =
-    let tofloat = \i -> maybe 0.0 (\j -> j) . S.toFloat
+    let tofloat = \i -> maybe 0.0 (\j -> j) . S.toFloat <| i
     in (tofloat rawx, tofloat rawy)
 
 {-| ゼロベクトル -}
@@ -182,57 +198,115 @@ clampVec (minX, minY) (maxX, maxY) (x, y) = (clamp minX maxX x, clamp minY maxY 
 -- レクト関係の関数
 -- ================================================================
 
-getOriginX : Rect -> Float
-getOriginX rect = getx rect.origin
-getOriginY : Rect -> Float
-getOriginY rect = gety rect.origin
+{-| コンストラクタ。
+    
+    フロートの値からレクト生成
+    rectf 20.0 30.0 40.0 50.0 == {origin=(20,30), size=(40,50)}
+ -}
+rectf : Float -> Float -> Float -> Float -> Rect
+rectf ox oy sw sh = {origin=(ox,oy), size=(sw,sh)}
 
-getSizeW : Rect -> Float
-getSizeW rect = getx rect.size
-getSizeH : Rect -> Float
-getSizeH rect = gety rect.size
+{-| コンストラクタ。
+    ベクターからレクトを生成
 
-getArea : Rect -> Float
-getArea {size} = uncurry (*) size
+    rectv (20,30) (40,50) == {origin=(20,30), size=(40,50)}
+ -}
+rectv : Vec -> Vec -> Rect
+rectv origin size = {origin=origin, size=size}
 
-getRectCenter : Rect -> Vec
-getRectCenter {origin, size} = addVec origin <| multVec 0.5 size
+{-| コンストラクタ。
+    文字列からレクトを生成。
 
--- サイズゼロのレクト
+    rects "R20,30,40,50" == {origin=(20,30), size=(40,50)}
+ -}
+rects : String -> Rect
+rects rectStr = stringToRect rectStr
+
+
+{-| サイズゼロのレクト -}
 zeroRect : Rect
 zeroRect = { origin = (0.0, 0.0), size = (0.0, 0.0) }
 
--- 単位レクト
+{-| 単位レクト -}
 unitRect : Rect
 unitRect = { origin = (1.0, 1.0), size = (1.0, 1.0) }
 
--- レクトを移動
+{-| レクトの始点のX要素を取得
+
+    getOriginX {origin=(20,30), size=(40,50)} == 20
+ -}
+getOriginX : Rect -> Float
+getOriginX rect = getx rect.origin
+
+{-| レクトの始点のY要素を取得
+
+    getOriginY {origin=(20,30), size=(40,50)} == 30
+ -}
+getOriginY : Rect -> Float
+getOriginY rect = gety rect.origin
+
+{-| 横幅（X要素）を取得
+
+    getSizeW {origin=(20,30), size=(40,50)} == 40
+ -}
+getSizeW : Rect -> Float
+getSizeW rect = getx rect.size
+
+{-| 縦幅（Y要素）を取得
+
+    getSizeH {origin=(20,30), size=(40,50)} == 50
+ -}
+getSizeH : Rect -> Float
+getSizeH rect = gety rect.size
+
+{-| 面積を取得
+
+    getArea {origin=(20,30), size=(40,50)} == 2000
+ -}
+getArea : Rect -> Float
+getArea {size} = uncurry (*) size
+
+{-| 中心部分を取得
+
+    getRectCenter {origin=(20,30), size=(40,50)} == (40, 55)
+ -}
+getRectCenter : Rect -> Vec
+getRectCenter {origin, size} = addVec origin <| multVec 0.5 size
+
+{-| レクトを移動
+ -}
 moveRect : Vec -> Rect -> Rect
 moveRect mvec rect = { rect | origin <- addVec mvec rect.origin }
 
--- レクトをリサイズ
+{-| レクトをリサイズ
+ -}
 resizeRect : Vec -> Rect -> Rect
 resizeRect newsize rect = { rect | size <- newsize }
 
 {-| レクトを文字列化
+
+    rectToString {origin = (20,20), size = (20,20)} == "R20,20,20,20"
+    ※現在サーバー側は正の整数しか受け付けないので、便宜上正の整数にすべての要素を変換するようにしている
  -}
 rectToString : Rect -> String
 rectToString rect = "R"
-     ++ (S.show . getx <| rect.origin)
-     ++ "," ++ (S.show . gety <| rect.origin)
-     ++ "," ++ (S.show . getx <| rect.size)
-     ++ "," ++ (S.show . gety <| rect.size)
+     ++ (S.show . absRound . getx <| rect.origin)
+     ++ "," ++ (S.show . absRound . gety <| rect.origin)
+     ++ "," ++ (S.show . absRound . getx <| rect.size)
+     ++ "," ++ (S.show . absRound . gety <| rect.size)
 
 {-| 文字列からレクトを作成する
+
+    stringToRect "R20,20,20,20" == {origin = (20,20), size = (20,20)}
  -}
-stringToRect : String -> Nothing Rect
+stringToRect : String -> Rect
 stringToRect rawRectStr =
     let unconsRectStr = S.uncons rawRectStr
-        createRect = \vals -> {origin = vecstr (Array.getOrElse "0" 0 vals) (Array.getOrElse "0" 1 vals),
-                               size = vecstr (Array.getOrElse "0" 2 vals) (Array.getOrElse "0" 3 vals)}
+        createRect = \vals -> {origin = vecstr ((Array.getOrElse "0" 0 vals), (Array.getOrElse "0" 1 vals)),
+                               size = vecstr ((Array.getOrElse "0" 2 vals), (Array.getOrElse "0" 3 vals))}
     in case unconsRectStr of
-        Nothing -> Nothing
-        ('R', rectStr) -> createRect <| Array.fromList <| S.split "," rectStr
+        Nothing -> unitRect
+        Just ('R', rectStr) -> createRect . Array.fromList . S.split "," <| rectStr
 
 {-| レクトをベクトルでクランプ
  -}

@@ -17,7 +17,6 @@ import String as S
 import Random
 import Char
 
--- 自作ライブラリのimport
 import MMMarioVector (..)
 import MMMarioUtil (..)
 import MMMarioType (..)
