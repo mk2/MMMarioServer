@@ -23,13 +23,15 @@
   new_block/2,
   new_block_from_others/2,
   change_player_name/2,
-  win_player/1
+  win_player/1,
+  lose_player/1
 ]).
 %% gen_fsm callbacks
 -export([
   init/1,
   idle/2,
   ongame/2,
+  postgame/2,
   handle_event/3,
   handle_sync_event/4,
   handle_info/3,
@@ -151,6 +153,14 @@ change_player_name(PUid, Name) ->
 win_player(PUid) ->
   gen_fsm:send_event(?PPID(PUid), win).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 負け通知を行う
+%% @end
+%%--------------------------------------------------------------------
+lose_player(PUid) ->
+  gen_fsm:send_event(?PPID(PUid), lose).
+
 %%%===================================================================
 %%% gen_fsm callbacks
 %%%===================================================================
@@ -243,6 +253,17 @@ ongame({new_block_from_others, Rect}, State = #playerstate{wsservpid = WSSrvPid}
 ongame(die, State = #playerstate{uid = PUid, roompid = RPid}) ->
   mmmario_room:die_player(RPid, PUid),
   {next_state, postgame, State}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% ゲーム終了後に負け通知を受け取る
+%% @end
+%%--------------------------------------------------------------------
+postgame(lose, State = #playerstate{wsservpid = WSSrvPid}) ->
+  mmmario_wsserv:send(WSSrvPid, "LOSE"),
+  Reply = ok,
+  {stop, "Lose", Reply, State}.
 
 %%--------------------------------------------------------------------
 %% @private

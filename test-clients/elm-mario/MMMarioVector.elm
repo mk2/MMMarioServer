@@ -61,8 +61,8 @@ vec (x, y) = (toFloat x, toFloat y)
 
     vecstr ("1", "2") == (1.0, 2.0)
  -}
-vecstr : (String, String) -> Vec
-vecstr  (rawx, rawy) =
+vecs : (String, String) -> Vec
+vecs  (rawx, rawy) =
     let tofloat = \i -> maybe 0.0 (\j -> j) . S.toFloat <| i
     in (tofloat rawx, tofloat rawy)
 
@@ -199,7 +199,7 @@ clampVec (minX, minY) (maxX, maxY) (x, y) = (clamp minX maxX x, clamp minY maxY 
 -- ================================================================
 
 {-| コンストラクタ。
-    
+
     フロートの値からレクト生成
     rectf 20.0 30.0 40.0 50.0 == {origin=(20,30), size=(40,50)}
  -}
