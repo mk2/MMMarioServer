@@ -164,7 +164,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 idle({new_player, PUid, Name}, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
-  MaxPCount = application:get_env(mmmario, maxpcount, 2),
+  MaxPCount = application:get_env(mmmario, maxpcount, 3),
   NextPCount = PCount + 1,
   HandlerId = mmmario_room_event:add_handler(EMPid, PTid, PUid),
   ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId, name = Name}),

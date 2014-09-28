@@ -155,7 +155,7 @@ checkCharaLiving chara = False
 stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, winHeight), blkRect) gameState =
     let
         -- ゲームのステート
-        stateName = gameState.stateName
+        stateName = log "stateName" <| gameState.stateName
 
         -- ブロックの移動速度
         moveSpd = vec (0, 10)
@@ -167,7 +167,7 @@ stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, win
         sendGenBlkData = "BLK " ++ rectToString blkRect
 
         -- 新規ブロック生成フラグ
-        isGenBlk = gameState.blockGenInterval > 2.0
+        isGenBlk = gameState.blockGenInterval > 3.0
 
         -- 移動速度
         moveStep = multVec moveCoeff (toFloat arr.x, 0)
@@ -199,35 +199,6 @@ stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, win
                                                                  , sendData         <- "" }
 
             -- Ongame 状態
-          | stateName == Ongame && command == "REC" -> { gameState | stateName        <- Ongame
-                                                                   , self             <- newSelf
-                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
-                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
-                                                                   , blocks           <- newBlks
-                                                                   , otherCharas      <- convRecvToCharas recvData clientName
-                                                                   , sendData         <- sendCharaRectData }
-
-          | stateName == Ongame && command == "BLK" -> { gameState | stateName        <- Ongame
-                                                                   , self             <- newSelf
-                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
-                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
-                                                                   , blocks           <- (convRecvToBlock recvData) :: newBlks
-                                                                   , sendData         <- sendCharaRectData }
-
-          | stateName == Ongame && command == "WIN" -> { gameState | stateName        <- Postgame
-                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
-                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
-                                                                   , blocks           <- newBlks
-                                                                   , result           <- Winner
-                                                                   , finish           <- True }
-
-          | stateName == Ongame && isDie            -> { gameState | stateName        <- Postgame
-                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
-                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
-                                                                   , blocks           <- newBlks
-                                                                   , sendData         <- "DIE"
-                                                                   , result           <- Loser }
-
           | stateName == Ongame && command == "REC" && isGenBlk
                                                     -> { gameState | stateName        <- Ongame
                                                                    , self             <- newSelf
@@ -252,10 +223,42 @@ stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, win
                                                                    , blocks           <- blkRect :: newBlks
                                                                    , sendData         <- sendCharaRectData ++ "|" ++ sendGenBlkData }
 
+          | stateName == Ongame && command == "REC" && not isGenBlk
+                                                    -> { gameState | stateName        <- Ongame
+                                                                   , self             <- newSelf
+                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
+                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
+                                                                   , blocks           <- newBlks
+                                                                   , otherCharas      <- convRecvToCharas recvData clientName
+                                                                   , sendData         <- sendCharaRectData }
+
+          | stateName == Ongame && command == "BLK" && not isGenBlk
+                                                    -> { gameState | stateName        <- Ongame
+                                                                   , self             <- newSelf
+                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
+                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
+                                                                   , blocks           <- (convRecvToBlock recvData) :: newBlks
+                                                                   , sendData         <- sendCharaRectData }
+
+          | stateName == Ongame && command == "WIN" -> { gameState | stateName        <- Postgame
+                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
+                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
+                                                                   , blocks           <- newBlks
+                                                                   , result           <- Winner
+                                                                   , finish           <- True }
+
+          | stateName == Ongame && isDie            -> { gameState | stateName        <- Postgame
+                                                                   , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
+                                                                   , blockGenInterval <- gameState.blockGenInterval + delta
+                                                                   , blocks           <- newBlks
+                                                                   , sendData         <- "DIE"
+                                                                   , result           <- Loser }
+
           | stateName == Ongame                     -> { gameState | stateName        <- Ongame
                                                                    , self             <- newSelf
                                                                    , ellapsedSeconds  <- gameState.ellapsedSeconds + delta
                                                                    , blockGenInterval <- gameState.blockGenInterval + delta
+                                                                   , blocks           <- newBlks
                                                                    , sendData         <- sendCharaRectData }
 
             -- Postgame 状態
