@@ -8,6 +8,8 @@ data StageTile = None | Cloud | Ground
 
 data StateName = Idle | Ongame | Postgame
 
+data Result = Candidate | Winner | Loser
+
 type UserInput = {
                    arr : {x : Int, y : Int}
                  , space : Bool
@@ -33,8 +35,10 @@ type GameState = {
                  , blockGenInterval : Float
                  , blocks : [Rect]
                  , stageSize : Vec
-                 , otherCharas : [(Int, (String, Vec))]
+                 , otherCharas : [Chara]
                  , sendData : String
                  , clientName : String
                  , windowDims : (Int, Int)
+                 , result : Result
+                 , finish : Bool
                  }

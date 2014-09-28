@@ -23,7 +23,7 @@ gameFps = 30
 
 -- サーバーへの送信FPS
 -- 上げるとすぐ死ぬので注意
-requestFps = 20
+requestFps = 30
 
 -- マリオ画像の幅(px)
 marioImageWidth = 20
@@ -62,9 +62,9 @@ defaultChara = {
                , isTouchOnDownBlock = False
                , isTouchOnRightBlock = False
                , mass = 100
-               , imageBaseName = ""
-               , imagePoseName = ""
-               , imageDireName = ""
+               , imageBaseName = "mario"
+               , imagePoseName = "stand"
+               , imageDireName = "right"
                }
 
 -- ゲームの初期状態
@@ -84,6 +84,8 @@ initialGameState = {
                    , clientName = ""
                    , stageSize = (400, 400)
                    , windowDims = (400, 400)
+                   , result = Candidate
+                   , finish = False
                    }
 
 -- キャラのジャンプ移動速度

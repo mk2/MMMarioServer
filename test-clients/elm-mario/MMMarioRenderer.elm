@@ -26,9 +26,15 @@ render (screenWidth, screenHeight) gameState =
         -- 自キャラ
         selfForm = renderChara gameState.self
 
+        -- 他のキャラ
+        otherCharaForms = renderCharas gameState.otherCharas
+
         blkForms = group . map renderBlock <| gameState.blocks
 
-    in collage screenWidth screenHeight <| [move moveOriginVec . group <| [blkForms, selfForm]]
+    in collage screenWidth screenHeight <| [move moveOriginVec . group <| [blkForms, otherCharaForms, selfForm]]
+
+renderCharas : [Chara] -> Form
+renderCharas charas = group . map renderChara <| charas
 
 renderChara : Chara -> Form
 renderChara c =
