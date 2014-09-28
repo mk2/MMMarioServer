@@ -50,15 +50,16 @@ convRecvToBlock recvData =
 
 {-|
     受信データをキャラクタータイプに変換
+    2つ目の引き数に自キャラの名前を入れることで取り除ける
 
-    convRecvToCharas "REC 1000 R20,20,20,20 2000 R30,30,30,30" ==
-        [{rect = {origin=(20,20), size=(20,20)}}, {rect = {origin=(30,30), size=(30,30)}}]
+    convRecvToCharas "REC 1000 R20,20,20,20 2000 R30,30,30,30" 1000 ==
+        [{rect = {rect = {origin=(30,30), size=(30,30)}}]
  -}
-convRecvToCharas : String -> [Chara]
-convRecvToCharas recvData =
+convRecvToCharas : String -> String -> [Chara]
+convRecvToCharas recvData clientName =
     let tokens = split " " recvData
         iden = head tokens
-        charaTupleList = takeCycle 2 . tail <| tokens -- [[name, rect]]
+        charaTupleList = filter (\[name, _] -> name /= clientName) . takeCycle 2 . tail <| tokens -- [[name, rect]]
     in map charaTupleToChara charaTupleList
 
 {-|
