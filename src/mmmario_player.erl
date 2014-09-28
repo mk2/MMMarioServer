@@ -51,7 +51,7 @@
 %% @end
 %%--------------------------------------------------------------------
 -record(playerstate, {
-  uid, % プレイヤーのUID {pid(), Name}
+  uid, % プレイヤーのUID {pid(), ref()}
   name, % プレイヤーの名前
   roompid, % roomのPid
   wsservpid, % wsservのPid
@@ -173,8 +173,8 @@ lose_player(PUid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([WSServPid, Name]) ->
-  PUid = {self(), Name},
-  RPid = mmmario_room_server:new_player(PUid),
+  PUid = {self(), make_ref()},
+  RPid = mmmario_room_server:new_player(PUid, Name),
   process_flag(trap_exit, true),
   link(WSServPid),
   {ok, idle, #playerstate{uid = PUid, wsservpid = WSServPid, name = Name, roompid = RPid}}.
@@ -261,7 +261,7 @@ ongame(die, State = #playerstate{uid = PUid, roompid = RPid}) ->
 %% @end
 %%--------------------------------------------------------------------
 postgame(lose, State = #playerstate{wsservpid = WSSrvPid}) ->
-  mmmario_wsserv:send(WSSrvPid, "LOSE"),
+  mmmario_wsserv:send(WSSrvPid, "LOS"),
   Reply = ok,
   {stop, "Lose", Reply, State}.
 
@@ -272,8 +272,9 @@ postgame(lose, State = #playerstate{wsservpid = WSSrvPid}) ->
 %% いつでも受け取る
 %% @end
 %%--------------------------------------------------------------------
-handle_event({name, Name}, SName, S) ->
-  {next_state, SName, S#playerstate{name = Name}}.
+handle_event({name, Name}, StateName, State = #playerstate{roompid = RPid, uid = PUid}) ->
+  mmmario_room:change_name(RPid, PUid, Name),
+  {next_state, StateName, State#playerstate{name = Name}}.
 
 %%--------------------------------------------------------------------
 %% @private

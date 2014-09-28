@@ -21,12 +21,13 @@
 -export([
   start_link/0,
   stop/1,
-  new_player/2,
+  new_player/3,
   exit_player/2,
   ready_player/2,
   die_player/2,
   move_player/3,
-  new_block/3
+  new_block/3,
+  change_name/3
 ]).
 
 %% gen_fsm callbacks
@@ -88,8 +89,8 @@ stop(RPid) ->
 %% プレイヤーが入れられた部屋のUidを返す
 %% @end
 %%--------------------------------------------------------------------
-new_player(RPid, PUid) ->
-  gen_fsm:send_event(RPid, {new_player, PUid}).
+new_player(RPid, PUid, Name) ->
+  gen_fsm:send_event(RPid, {new_player, PUid, Name}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -131,6 +132,14 @@ new_block(RPid, PUid, Rect) ->
 die_player(RPid, PUid) ->
   gen_fsm:send_event(RPid, {die_player, PUid}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 名前変更
+%% @end
+%%--------------------------------------------------------------------
+change_name(RPid, PUid, Name) ->
+  gen_fsm:send_all_state_event(RPid, {change_name, PUid, Name}).
+
 %%%===================================================================
 %%% gen_fsm callbacks
 %%%===================================================================
@@ -154,11 +163,11 @@ init([]) ->
 %% プレイヤー追加イベントが来たら追加する
 %% @end
 %%--------------------------------------------------------------------
-idle({new_player, PUid}, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
-  MaxPCount = application:get_env(mmmario, maxpcount, 6),
+idle({new_player, PUid, Name}, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
+  MaxPCount = application:get_env(mmmario, maxpcount, 2),
   NextPCount = PCount + 1,
   HandlerId = mmmario_room_event:add_handler(EMPid, PTid, PUid),
-  ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId, name = element(2, PUid)}),
+  ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId, name = Name}),
   if
     MaxPCount =:= NextPCount ->
       error_logger:info_msg("Room[~p] is full of players.~n", [self()]),
@@ -278,7 +287,17 @@ handle_event({exit_player, PUid}, StateName, State = #roomstate{ptid = PTid, emp
       error_logger:error_msg("No body in the room[~p]~n", [self()]),
       ok = mmmario_room_server:delete_room(self()),
       {stop, "No body in the room.", State#roomstate{pcount = 0}}
-  end.
+  end;
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% 名前変更イベント
+%% @end
+%%--------------------------------------------------------------------
+handle_event({change_name, PUid, Name}, StateName, State = #roomstate{ptid = PTid}) ->
+  ets:update_element(PTid, PUid, {#cinfo.name, Name}),
+  {next_state, StateName, State}.
 
 %%--------------------------------------------------------------------
 %% @private

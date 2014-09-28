@@ -91,7 +91,7 @@ rect_to_text(#rect{origin = Origin, size = Size}) ->
 %% @end
 %%--------------------------------------------------------------------
 namedrect_to_text({Name, Rect}) ->
-  Name ++ "-" ++ rect_to_text(Rect).
+  Name ++ " " ++ rect_to_text(Rect).
 
 %%--------------------------------------------------------------------
 %% @doc

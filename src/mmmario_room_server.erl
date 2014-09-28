@@ -18,7 +18,7 @@
 -export([
   start_link/0,
   stop/0,
-  new_player/1,
+  new_player/2,
   new_state/2,
   delete_room/1,
   all_room/0,
@@ -75,8 +75,8 @@ stop() ->
 %% 新規プレイヤー
 %% @end
 %%--------------------------------------------------------------------
-new_player(PUid) ->
-  gen_server:call(?SERVER, {new_player, PUid}).
+new_player(PUid, Name) ->
+  gen_server:call(?SERVER, {new_player, PUid, Name}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -135,7 +135,7 @@ init([]) ->
 %% 新規プレイヤーを空いてる部屋へ誘導する
 %% @end
 %%--------------------------------------------------------------------
-handle_call({new_player, PUid}, _From, State) ->
+handle_call({new_player, PUid, Name}, _From, State) ->
   % etsでidle状態にある部屋がないかチェック
   RPids = ets:select(?SERVER, ets:fun2ms(
     fun(#rinfo{pid = RPid, state = RState})
@@ -147,12 +147,12 @@ handle_call({new_player, PUid}, _From, State) ->
     0 < length(RPids) ->
       RPid = hd(RPids),
       error_logger:info_msg("Empty room[~p] found.~n", [RPid]),
-      mmmario_room:new_player(RPid, PUid),
+      mmmario_room:new_player(RPid, PUid, Name),
       {reply, RPid, State};
     true ->
       error_logger:info_msg("No empty room found.~n"),
       {ok, RPid} = mmmario_room_sup:start_room(),
-      mmmario_room:new_player(RPid, PUid),
+      mmmario_room:new_player(RPid, PUid, Name),
       ets:insert(?SERVER, #rinfo{pid = RPid, state = idle}),
       {reply, RPid, State}
   end;
