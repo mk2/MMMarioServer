@@ -37,6 +37,7 @@ type GameState = {
                  , stageSize : Vec
                  , otherCharas : [Chara]
                  , sendData : String
+                 , recvData : String
                  , clientName : String
                  , windowDims : (Int, Int)
                  , result : Result

@@ -29,9 +29,18 @@ render (screenWidth, screenHeight) gameState =
         -- 他のキャラ
         otherCharaForms = renderCharas gameState.otherCharas
 
+        -- ブロック
         blkForms = group . map renderBlock <| gameState.blocks
 
-    in collage screenWidth screenHeight <| [move moveOriginVec . group <| [blkForms, otherCharaForms, selfForm]]
+        -- デバッグ用に受信データの表示を行う
+        recvDataDispVec = vec (200, screenHeight - 20)
+        recvDataForm = move recvDataDispVec . toForm . plainText <| "RECV: " ++ gameState.recvData
+
+        -- デバッグ用に送信データの表示を行う
+        sendDataDispVec = vec (200, screenHeight - 50)
+        sendDataForm = move sendDataDispVec . toForm . plainText <| "SEND: " ++ gameState.sendData
+
+    in collage screenWidth screenHeight <| [move moveOriginVec . group <| [blkForms, otherCharaForms, selfForm, recvDataForm, sendDataForm]]
 
 renderCharas : [Chara] -> Form
 renderCharas charas = group . map renderChara <| charas

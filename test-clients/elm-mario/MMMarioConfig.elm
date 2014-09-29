@@ -77,6 +77,7 @@ initialGameState = {
                                            }
                    , stateName = Idle
                    , sendData = ""
+                   , recvData = ""
                    , ellapsedSeconds = 0.0
                    , blockGenInterval = 0.0
                    , blocks = [{origin = zeroVec, size = vec (640, 100)}]
