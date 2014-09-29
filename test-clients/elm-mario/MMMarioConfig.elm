@@ -70,7 +70,7 @@ defaultChara = {
 -- ゲームの初期状態
 initialGameState : GameState
 initialGameState = {
-                     self = { defaultChara | rect <- { origin = (300, 500), size = (20, 32) }
+                     self = { defaultChara | rect <- { origin = (280, 500), size = (20, 32) }
                                            , imageBaseName <- "mario"
                                            , imagePoseName <- "stand"
                                            , imageDireName <- "right"
@@ -80,7 +80,7 @@ initialGameState = {
                    , recvData = ""
                    , ellapsedSeconds = 0.0
                    , blockGenInterval = 0.0
-                   , blocks = [{origin = zeroVec, size = vec (640, 100)}]
+                   , blocks = [{origin = (160, 0), size = vec (320, 100)}]
                    , otherCharas = []
                    , clientName = ""
                    , stageSize = (400, 400)

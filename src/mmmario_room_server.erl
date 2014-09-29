@@ -193,7 +193,7 @@ handle_call(all_room_count, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({new_state, RPid, RState}, State) ->
-  ets:insert(?SERVER, #rinfo{pid = RPid, state = RState}),
+  ets:update_element(?SERVER, RPid, {#rinfo.state, RState}),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

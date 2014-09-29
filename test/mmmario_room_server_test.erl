@@ -53,6 +53,6 @@ cleanup_room_server(SPid) ->
 %%--------------------------------------------------------------------
 new_player_to_server(_SPid) ->
   PUids = [{self(), make_ref()} || _ <- lists:seq(1, 10)],
-  [mmmario_room_server:new_player(PUid) || PUid <- PUids],
+  [mmmario_room_server:new_player(PUid, "FakeName") || PUid <- PUids],
   RoomCount = mmmario_room_server:all_room_count(),
-  [?_assertEqual(2, RoomCount)].
+  [?_assertEqual(4, RoomCount)].

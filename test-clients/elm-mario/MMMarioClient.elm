@@ -158,10 +158,10 @@ updateCharaImage m = m
     キャラクターの生死を判定
     上下が画面外に触れたら死亡
  -}
-checkCharaLiving chara h =
+checkCharaLiving chara =
     let bottom = getOriginY chara.rect
         top = bottom + getSizeH chara.rect
-    in bottom <= 0.0 || top >= h
+    in bottom <= 0.0 || top >= 640
 
 {-|
     ゲーム関数
@@ -196,7 +196,7 @@ stepGame (delta, (arr, space, shift, keyF), recvData, clientName, (winWidth, win
         newSelf = updateCharaImage . calcCharaPos newBlks otherCharasRect delta . calcCharaSpd delta moveStep shift space <| gameState.self
 
         -- キャラが死んだかどうか
-        isDie = checkCharaLiving newSelf <| toFloat winHeight
+        isDie = checkCharaLiving newSelf
 
         -- 送信するマリオの位置情報
         sendCharaRectData = convCharaToSend newSelf

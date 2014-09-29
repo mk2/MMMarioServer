@@ -212,20 +212,25 @@ pregame({ready_player, _PUid}, State = #roomstate{pcount = PCount, rcount = RCou
 %%--------------------------------------------------------------------
 ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount, empid = EMPid}) ->
   NextPCount = PCount - 1,
+  HandlerId = hd(hd(ets:match(PTid, #cinfo{uid = PUid, hid = '$1', _ = '_'}))),
+  mmmario_room_event:delete_handler(EMPid, HandlerId),
   IsKey = ets:member(PTid, PUid),
   if
     IsKey andalso 1 < NextPCount ->
       error_logger:info_msg("The player [~p] dies.~n", [PUid]),
       ets:update_element(PTid, PUid, {#cinfo.state, dead}),
       {next_state, ongame, State#roomstate{pcount = NextPCount}};
-    IsKey andalso 1 == NextPCount ->
+
+    IsKey andalso 1 =:= NextPCount ->
       ets:update_element(PTid, PUid, {#cinfo.state, dead}),
       AlivePUid = hd(hd(ets:match(PTid, #cinfo{state = alive, uid = '$1', _ = '_'}))),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
       mmmario_room_event:notice_winner(EMPid, AlivePUid),
       mmmario_room_server:new_state(self(), postgame),
       {next_state, postgame, State#roomstate{pcount = NextPCount}};
+
     not IsKey -> {next_state, ongame, State};
+
     0 >= NextPCount ->
       ok = mmmario_room_server:delete_room(self()),
       {stop, "No body in the room.", State#roomstate{pcount = 0}}
@@ -277,12 +282,14 @@ handle_event({exit_player, PUid}, StateName, State = #roomstate{ptid = PTid, emp
   if
     1 < NextPCount ->
       {next_state, StateName, State#roomstate{pcount = NextPCount}};
+
     ongame =:= StateName andalso 1 =:= NextPCount ->
       AlivePUid = hd(hd(ets:match(PTid, #cinfo{state = alive, uid = '$1', _ = '_'}))),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
       mmmario_room_event:notice_winner(EMPid, AlivePUid),
       mmmario_room_server:new_state(self(), postgame),
       {next_state, postgame, State#roomstate{pcount = NextPCount}};
+
     0 >= NextPCount ->
       error_logger:error_msg("No body in the room[~p]~n", [self()]),
       ok = mmmario_room_server:delete_room(self()),
