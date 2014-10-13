@@ -77,9 +77,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # You will need to create the manifests directory and a manifest in
   # the file default.pp in the manifests_path directory.
   #
+  config.vm.provision "shell" do |shell|
+    shell.inline = "puppet module install puppetlabs-apt --modulepath=/vagrant/manifests/modules"
+  end
   config.vm.provision "puppet" do |puppet|
     puppet.manifests_path = "manifests"
-    puppet.manifest_file  = "default.pp"
+    puppet.manifest_file  = "site.pp"
+    puppet.module_path    = "manifests/modules"
   end
 
   # Enable provisioning with chef solo, specifying a cookbooks path, roles
