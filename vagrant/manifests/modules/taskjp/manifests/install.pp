@@ -4,7 +4,7 @@
 #
 class taskjp::install {
 
-    package { 'task-japanese':
+    package { "task-japanese":
         ensure => installed,
     }
 
