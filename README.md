@@ -1,6 +1,11 @@
 MMMarioServer
 ===================
 
+Multi play game works on browser supporting websocket.
+
+Examples of Messages
+===
+
 Client to Server Messages
 ---
 

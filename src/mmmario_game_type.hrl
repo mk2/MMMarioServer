@@ -20,6 +20,7 @@
 %% ２次元のみを想定
 %% @end
 %%--------------------------------------------------------------------
+-type vec() :: {X :: number(), Y :: number()}.
 -record(vec, {
   x, % X要素
   y  % Y要素
@@ -31,8 +32,20 @@
 % ゼロベクトル
 -define(ZERO_VEC, #vec{x = 0, y = 0}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% X要素の取得
+%% @end
+%%--------------------------------------------------------------------
+-spec getx/1 :: (vec()) -> number().
 getx(#vec{x = X}) -> X.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Y要素の取得
+%% @end
+%%--------------------------------------------------------------------
+-spec gety/1 :: (vec()) -> number().
 gety(#vec{y = Y}) -> Y.
 
 %%====================================================================
@@ -45,6 +58,7 @@ gety(#vec{y = Y}) -> Y.
 %% ２次元のみを想定
 %% @end
 %%--------------------------------------------------------------------
+-type rect() :: {Origin :: vec(), Size :: vec()}.
 -record(rect, {
   origin, % 原点 vec()
   size    % サイズ vec()
@@ -62,6 +76,7 @@ gety(#vec{y = Y}) -> Y.
 %% ex: "R5,4,3,2" -> #rect{origin = #vec{x = 5, y = 4}, size = #vec{x = 3, y = 2}}
 %% @end
 %%--------------------------------------------------------------------
+-spec text_to_rect/1 :: (string()) -> rect().
 text_to_rect("R" ++ RawText) ->
   [{X, _}, {Y, _}, {W, _}, {H, _} | _] = lists:map(fun(Txt) -> string:to_integer(Txt) end, string:tokens(RawText, ",")),
   #rect{origin = #vec{x = X, y = Y}, size = #vec{x = W, y = H}}.
@@ -72,6 +87,7 @@ text_to_rect("R" ++ RawText) ->
 %% ex: #rect{origin = #vec{x = 5, y = 4}, size = #vec{x = 3, y = 2}} -> "R5,4,3,2"
 %% @end
 %%--------------------------------------------------------------------
+-spec rect_to_text/1 :: (rect()) -> string().
 rect_to_text(#rect{origin = Origin, size = Size}) ->
   lists:flatten([
     "R",
@@ -90,6 +106,7 @@ rect_to_text(#rect{origin = Origin, size = Size}) ->
 %% "TeST R20,20,20,20"みたいになる
 %% @end
 %%--------------------------------------------------------------------
+-spec namedrect_to_text/1 :: ({string(), rect()}) -> string().
 namedrect_to_text({Name, Rect}) ->
   Name ++ " " ++ rect_to_text(Rect).
 
@@ -98,6 +115,7 @@ namedrect_to_text({Name, Rect}) ->
 %% 複数のレクトをテキストのリストに変換
 %% @end
 %%--------------------------------------------------------------------
+-spec rects_to_text/1 :: (rect()) -> [string()].
 rects_to_text(Rects) ->
   [rect_to_text(Rect) || Rect <- Rects].
 
@@ -106,9 +124,22 @@ rects_to_text(Rects) ->
 %% [{"test", #rect()}+]のような形式になっているレクトをテキストのリストに変換
 %% @end
 %%--------------------------------------------------------------------
+-spec namedrects_to_text/1 :: ([{string(), rect()}]) -> [string()].
 namedrects_to_text(NamedRects) ->
   [namedrect_to_text(NamedRect) || NamedRect <- NamedRects].
 
+%%--------------------------------------------------------------------
+%% @doc
+%% レクトの原点を取得
+%% @end
+%%--------------------------------------------------------------------
+-spec getorigin/1 :: (rect()) -> vec().
 getorigin(#rect{origin = Origin}) -> Origin.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% レクトのサイズを取得
+%% @end
+%%--------------------------------------------------------------------
+-spec getsize/1 :: (rect()) -> vec().
 getsize(#rect{size = Size}) -> Size.
