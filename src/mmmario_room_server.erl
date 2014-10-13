@@ -19,6 +19,7 @@
   start_link/0,
   stop/0,
   new_player/2,
+  join_room/2,
   new_state/2,
   delete_room/1,
   all_room/0,
@@ -46,9 +47,9 @@
 %% @end
 %%--------------------------------------------------------------------
 -record(rinfo, {
-  pid, % 部屋のPID pid()
-  state, % 部屋の状態
-  name % 部屋の名前
+  pid :: pid(), % 部屋のPID pid()
+  state :: atom(), % 部屋の状態
+  name :: string() % 部屋の名前
 }).
 
 %%%===================================================================
@@ -81,6 +82,13 @@ new_player(PUid, Name) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% 特定の部屋に参加する
+%% @end
+%%--------------------------------------------------------------------
+join_room(PUid, RoomPid) -> ok.
+
+%%--------------------------------------------------------------------
+%% @doc
 %% 部屋の状態変更
 %% @end
 %%--------------------------------------------------------------------
@@ -97,7 +105,7 @@ delete_room(RPid) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% 全ての部屋PidをETSから取得
+%% 全ての部屋情報をETSから取得
 %% @end
 %%--------------------------------------------------------------------
 all_room() ->
@@ -127,7 +135,8 @@ all_room_count() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  ?SERVER = ets:new(?SERVER, [set, named_table, {keypos, #rinfo.pid}]),
+  % room serverで使うETSは1個だけ作れば良い
+  ?SERVER = ets:new(?SERVER, [set, named_table, {keypos, #rinfo.pid}, {write_concurrency, true}, {read_concurrency, true}]),
   {ok, #rsrvstate{}}.
 
 %%--------------------------------------------------------------------
@@ -139,8 +148,7 @@ init([]) ->
 handle_call({new_player, PUid, Name}, _From, State) ->
   % etsでidle状態にある部屋がないかチェック
   RPids = ets:select(?SERVER, ets:fun2ms(
-    fun(#rinfo{pid = RPid, state = RState})
-      when idle == RState ->
+    fun(#rinfo{pid = RPid, state = RState}) when idle =:= RState ->
       RPid
     end
   )),
@@ -171,12 +179,12 @@ handle_call({delete_room, RPid}, _From, State) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% 全ての部屋を取得
+%% 全ての部屋情報を取得
 %% @end
 %%--------------------------------------------------------------------
 handle_call(all_room, _From, State) ->
-  RPids = ets:all(),
-  {reply, RPids, State};
+  Rooms = ets:all(),
+  {reply, Rooms, State};
 
 %%--------------------------------------------------------------------
 %% @doc
