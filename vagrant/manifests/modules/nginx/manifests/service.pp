@@ -1,13 +1,12 @@
-
 # Class: nginx::service
 #
 #
 class nginx::service {
 
-    service { "nginx":
-        enable      => true,
-        ensure      => running,
-        hasrestart  => true,
-    }
+  service { "nginx":
+    enable      => true,
+    ensure      => running,
+    hasrestart  => true,
+  }
 
 }
