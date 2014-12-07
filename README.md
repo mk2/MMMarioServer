@@ -32,4 +32,6 @@ WIN
 
 ## Screen shots
 
-![]()
+![ss1](https://raw.githubusercontent.com/mk2/MMMarioServer/master/doc/screenshot1.jpg)
+
+![ss2](https://raw.githubusercontent.com/mk2/MMMarioServer/master/doc/screenshot2.jpg)
