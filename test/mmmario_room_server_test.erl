@@ -12,6 +12,7 @@
 -compile([export_all]).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("mmmario_test_utils.hrl").
 
 %%====================================================================
 %% room server用テスト
@@ -52,7 +53,7 @@ cleanup_room_server(SPid) ->
 %% @end
 %%--------------------------------------------------------------------
 new_player_to_server(_SPid) ->
-  PUids = [{self(), make_ref()} || _ <- lists:seq(1, 10)],
+  PUids = [spawnFakeEchoPlayerUid(self()) || _ <- lists:seq(1, 10)],
   [mmmario_room_server:new_player(PUid, "FakeName") || PUid <- PUids],
   RoomCount = mmmario_room_server:all_room_count(),
   [?_assertEqual(4, RoomCount)].

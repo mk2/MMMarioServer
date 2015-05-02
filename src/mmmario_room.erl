@@ -151,7 +151,7 @@ change_name(RPid, PUid, Name) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  PTid = ets:new(?SERVER, [set, protected, {keypos, #cinfo.uid}, {read_concurrency, true}, {write_concurrency, true}]),
+  PTid = ets:new(?SERVER, [set, protected, {keypos, #charainfo.uid}, {read_concurrency, true}, {write_concurrency, true}]),
   {ok, EMPid} = mmmario_room_event:start_link(),
   process_flag(trap_exit, true),
   {ok, idle, #roomstate{ptid = PTid, empid = EMPid}}.
@@ -167,7 +167,7 @@ idle({new_player, PUid, Name}, State = #roomstate{ptid = PTid, empid = EMPid, pc
   MaxPCount = application:get_env(mmmario, maxpcount, 3),
   NextPCount = PCount + 1,
   HandlerId = mmmario_room_event:add_handler(EMPid, PTid, PUid),
-  ets:insert(PTid, #cinfo{uid = PUid, hid = HandlerId, name = Name}),
+  ets:insert(PTid, #charainfo{uid = PUid, hid = HandlerId, name = Name}),
   if
     MaxPCount =:= NextPCount ->
       error_logger:info_msg("Room[~p] is full of players.~n", [self()]),
@@ -212,18 +212,18 @@ pregame({ready_player, _PUid}, State = #roomstate{pcount = PCount, rcount = RCou
 %%--------------------------------------------------------------------
 ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount, empid = EMPid}) ->
   NextPCount = PCount - 1,
-  HandlerId = hd(hd(ets:match(PTid, #cinfo{uid = PUid, hid = '$1', _ = '_'}))),
+  HandlerId = hd(hd(ets:match(PTid, #charainfo{uid = PUid, hid = '$1', _ = '_'}))),
   mmmario_room_event:delete_handler(EMPid, HandlerId),
   IsKey = ets:member(PTid, PUid),
   if
     IsKey andalso 1 < NextPCount ->
       error_logger:info_msg("The player [~p] dies.~n", [PUid]),
-      ets:update_element(PTid, PUid, {#cinfo.state, dead}),
+      ets:update_element(PTid, PUid, {#charainfo.state, dead}),
       {next_state, ongame, State#roomstate{pcount = NextPCount}};
 
     IsKey andalso 1 =:= NextPCount ->
-      ets:update_element(PTid, PUid, {#cinfo.state, dead}),
-      AlivePUid = hd(hd(ets:match(PTid, #cinfo{state = alive, uid = '$1', _ = '_'}))),
+      ets:update_element(PTid, PUid, {#charainfo.state, dead}),
+      AlivePUid = hd(hd(ets:match(PTid, #charainfo{state = alive, uid = '$1', _ = '_'}))),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
       mmmario_room_event:notice_winner(EMPid, AlivePUid),
       mmmario_room_server:new_state(self(), postgame),
@@ -244,7 +244,7 @@ ongame({die_player, PUid}, State = #roomstate{ptid = PTid, pcount = PCount, empi
 %% @end
 %%--------------------------------------------------------------------
 ongame({move_player, PUid, Rect}, State = #roomstate{ptid = PTid, empid = EMPid}) ->
-  ets:update_element(PTid, PUid, {#cinfo.rect, Rect}),
+  ets:update_element(PTid, PUid, {#charainfo.rect, Rect}),
   mmmario_room_event:notice_rects(EMPid, PUid),
   {next_state, ongame, State};
 
@@ -276,15 +276,15 @@ postgame({_, _PUid}, State) ->
 %%--------------------------------------------------------------------
 handle_event({exit_player, PUid}, StateName, State = #roomstate{ptid = PTid, empid = EMPid, pcount = PCount}) ->
   NextPCount = PCount - 1,
-  HandlerId = hd(hd(ets:match(PTid, #cinfo{uid = PUid, hid = '$1', _ = '_'}))),
+  HandlerId = hd(hd(ets:match(PTid, #charainfo{uid = PUid, hid = '$1', _ = '_'}))),
   mmmario_room_event:delete_handler(EMPid, HandlerId),
-  ets:match_delete(PTid, #cinfo{uid = PUid, _ = '_'}),
+  ets:match_delete(PTid, #charainfo{uid = PUid, _ = '_'}),
   if
     1 < NextPCount ->
       {next_state, StateName, State#roomstate{pcount = NextPCount}};
 
     ongame =:= StateName andalso 1 =:= NextPCount ->
-      AlivePUid = hd(hd(ets:match(PTid, #cinfo{state = alive, uid = '$1', _ = '_'}))),
+      AlivePUid = hd(hd(ets:match(PTid, #charainfo{state = alive, uid = '$1', _ = '_'}))),
       error_logger:info_msg("The player [~p] wins at the room [~p].~n", [AlivePUid, self()]),
       mmmario_room_event:notice_winner(EMPid, AlivePUid),
       mmmario_room_server:new_state(self(), postgame),
@@ -303,7 +303,7 @@ handle_event({exit_player, PUid}, StateName, State = #roomstate{ptid = PTid, emp
 %% @end
 %%--------------------------------------------------------------------
 handle_event({change_name, PUid, Name}, StateName, State = #roomstate{ptid = PTid}) ->
-  ets:update_element(PTid, PUid, {#cinfo.name, Name}),
+  ets:update_element(PTid, PUid, {#charainfo.name, Name}),
   {next_state, StateName, State}.
 
 %%--------------------------------------------------------------------
@@ -360,7 +360,7 @@ format_status(normal, [PDict, StatusData]) ->
   [{data, [
     {"PCount", StatusData#roomstate.pcount},
     {"RCount", StatusData#roomstate.rcount},
-    {"Players", ets:match_object(StatusData#roomstate.ptid, #cinfo{_ = '_'})}]}].
+    {"Players", ets:match_object(StatusData#roomstate.ptid, #charainfo{_ = '_'})}]}].
 
 %%%===================================================================
 %%% Internal functions

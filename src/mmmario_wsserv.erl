@@ -200,7 +200,7 @@ handle_info(Msg, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({event, {move, Rect}}, State = #wsservstate{puid = PUid}) ->
-  error_logger:info_msg("move request~n"),
+  io:format("move request~n"),
   mmmario_player:move_player(PUid, Rect),
   {noreply, State};
 
@@ -212,7 +212,7 @@ handle_cast({event, {move, Rect}}, State = #wsservstate{puid = PUid}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({event, {block, Rect}}, State = #wsservstate{puid = PUid}) ->
-  error_logger:info_msg("block request~n"),
+  io:format("block request~n"),
   mmmario_player:new_block(PUid, Rect),
   {noreply, State};
 
@@ -224,7 +224,7 @@ handle_cast({event, {block, Rect}}, State = #wsservstate{puid = PUid}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({event, {name, Name}}, State = #wsservstate{puid = PUid}) ->
-  error_logger:info_msg("name request~n"),
+  io:format("name request~n"),
   mmmario_player:change_player_name(PUid, Name),
   {noreply, State};
 
@@ -235,7 +235,7 @@ handle_cast({event, {name, Name}}, State = #wsservstate{puid = PUid}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({event, die}, State = #wsservstate{puid = PUid}) ->
-  error_logger:info_msg("die request~n"),
+  io:format("die request~n"),
   mmmario_player:die_player(PUid),
   {noreply, State};
 
@@ -636,20 +636,3 @@ apply_mask_key(RawMsg, MaskKey) ->
   RawMsgList = binary:bin_to_list(RawMsg),
   {MaskKey, binary:list_to_bin(lists:flatten([[Val bxor Mask] ||
     {Val, Mask} <- lists:zip(RawMsgList, MaskKeyList)]))}.
-%%   {MaskKey, binary:list_to_bin(lists:flatten([[Val1 bxor MK1, Val2 bxor MK2, Val3 bxor MK3, Val4 bxor MK4] ||
-%%     <<Val1:8, Val2:8, Val3:8, Val4:8>> <= RawMsg]))}.
-
-%%%===================================================================
-%%% テスト関数
-%%%===================================================================
-make_accept_header_value_test() ->
-  SWKey = "E4WSEcseoWr4csPLS2QJHA==",
-  AcceptHeaderValue = make_accept_header_value(SWKey),
-  io:format("AcceptHeaderValue: ~p~n", [AcceptHeaderValue]),
-  "7eQChgCtQMnVILefJAO6dK5JwPc=" = AcceptHeaderValue.
-
-encode_ws_dataframe_test(Data) ->
-  WSDataFrame = mmmario_wsserv:encode_ws_dataframe(Data, #{mask => <<4, 5, 1, 4>>}),
-  io:format("WS Dataframe: ~p~n", [WSDataFrame]),
-  #wsdataframe{data = Data} = mmmario_wsserv:decode_ws_dataframe(WSDataFrame).
-

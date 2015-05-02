@@ -9,26 +9,44 @@ Examples of Messages
 Client to Server Messages
 ---
 
-MOV R20,20,20,20
+### MOV rect()
+- キャラ動く
 
-BLK R20,20,20,20
+### BLK rect()
+- ブロック生成
 
-DIE
+### DIE
+- 死亡通知
 
-NAM 213210321
+### NAM number()
+- 名前更新
+
+### RMS
+- 部屋一覧を取得
+
+### NRM
+- 新しい部屋を作る
+
+### JRM number()
+- 指定した番号の部屋に参加
 
 Server to Client Messages
 ---
 
-REC 3210 R20,20,20,20 3210 R20,20,20,20
+### REC number() rect() number() rect()
+- 現在のキャラクター一覧
 
-BLK R20,20,20,20
+### BLK rect()
+- ブロック一覧
 
-RED
+### RED
+- 待機状態確認
 
-LOS
+### LOS
+- 負け
 
-WIN
+### WIN
+- 勝ち
 
 ## Screen shots
 

@@ -16,7 +16,7 @@
 %% キャラクター情報レコード。ETSで使う
 %% @end
 %%--------------------------------------------------------------------
--record(cinfo, {
+-record(charainfo, {
   uid :: puid(), % プレイヤーのUID {pid(), Name}
   hid :: hid(), % イベントハンドラID
   name :: string(), % プレイヤー名 Name

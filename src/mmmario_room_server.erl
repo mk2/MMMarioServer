@@ -23,7 +23,9 @@
   new_state/2,
   delete_room/1,
   all_room/0,
-  all_room_count/0
+  all_empty_room/0,
+  all_room_count/0,
+  all_empty_room_count/0
 ]).
 
 %% gen_server callbacks
@@ -46,7 +48,7 @@
 %% 部屋情報
 %% @end
 %%--------------------------------------------------------------------
--record(rinfo, {
+-record(roominfo, {
   pid :: pid(), % 部屋のPID pid()
   state :: atom(), % 部屋の状態
   name :: string() % 部屋の名前
@@ -113,11 +115,27 @@ all_room() ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% 全ての空いている部屋を取得
+%% @end
+%%--------------------------------------------------------------------
+all_empty_room() ->
+  gen_server:call(?SERVER, all_empty_room).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% 部屋総数を取得
 %% @end
 %%--------------------------------------------------------------------
 all_room_count() ->
   gen_server:call(?SERVER, all_room_count).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 全ての空いている部屋数を取得
+%% @end
+%%--------------------------------------------------------------------
+all_empty_room_count() ->
+  gen_server:call(?SERVER, all_empty_room_count).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -136,7 +154,7 @@ all_room_count() ->
 %%--------------------------------------------------------------------
 init([]) ->
   % room serverで使うETSは1個だけ作れば良い
-  ?SERVER = ets:new(?SERVER, [set, named_table, {keypos, #rinfo.pid}, {write_concurrency, true}, {read_concurrency, true}]),
+  ?SERVER = ets:new(?SERVER, [set, named_table, {keypos, #roominfo.pid}, {write_concurrency, true}, {read_concurrency, true}]),
   {ok, #rsrvstate{}}.
 
 %%--------------------------------------------------------------------
@@ -148,21 +166,21 @@ init([]) ->
 handle_call({new_player, PUid, Name}, _From, State) ->
   % etsでidle状態にある部屋がないかチェック
   RPids = ets:select(?SERVER, ets:fun2ms(
-    fun(#rinfo{pid = RPid, state = RState}) when idle =:= RState ->
+    fun(#roominfo{pid = RPid, state = RState}) when idle =:= RState ->
       RPid
     end
   )),
   if
     0 < length(RPids) ->
       RPid = hd(RPids),
-      error_logger:info_msg("Empty room[~p] found.~n", [RPid]),
+      io:format("Empty room[~p] found.~n", [RPid]),
       mmmario_room:new_player(RPid, PUid, Name),
       {reply, RPid, State};
     true ->
-      error_logger:info_msg("No empty room found.~n"),
+      io:format("No empty room found.~n"),
       {ok, RPid} = mmmario_room_sup:start_room(),
       mmmario_room:new_player(RPid, PUid, Name),
-      ets:insert(?SERVER, #rinfo{pid = RPid, state = idle}),
+      ets:insert(?SERVER, #roominfo{pid = RPid, state = idle}),
       {reply, RPid, State}
   end;
 
@@ -202,7 +220,7 @@ handle_call(all_room_count, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({new_state, RPid, RState}, State) ->
-  ets:update_element(?SERVER, RPid, {#rinfo.state, RState}),
+  ets:update_element(?SERVER, RPid, {#roominfo.state, RState}),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -222,7 +240,6 @@ handle_info(_Info, State) ->
 %% @private
 %% @doc
 %% 終了時コールバック。ETSを終わらせておく
-%%
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
@@ -233,7 +250,6 @@ terminate(_Reason, _State) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%%
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------

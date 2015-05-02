@@ -147,7 +147,7 @@ handle_event(ready, State = #roomevtstate{puid = PUid}) ->
 %%--------------------------------------------------------------------
 handle_event({rects, SenderPUid}, State = #roomevtstate{puid = PUid, ptid = PTid}) when SenderPUid =/= PUid ->
   NamedRects = ets:select(PTid, ets:fun2ms(
-    fun(#cinfo{name = Name, rect = Rect}) -> {Name, Rect} end
+    fun(#charainfo{name = Name, rect = Rect}) -> {Name, Rect} end
   )),
   mmmario_player:move_other_players(PUid, NamedRects),
   {ok, State};
